@@ -1,5 +1,9 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
+import { fileURLToPath } from 'url'
+
+// For ESM, we need to define __dirname manually
+const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
   build: {
