@@ -418,9 +418,10 @@ li { list-style: none; }
   .ahc-stats-row { gap: 10px; }
   .ahc-num { font-size: 22px; }
 }
-/* Selection Highlight */
-::selection { background: var(--gold); color: var(--navy); }
-::-moz-selection { background: var(--gold); color: var(--navy); }
+/* Department Dots */
+.j-dot.it         { background: #0D1B3E; }
+.j-dot.non-it     { background: #C9A84C; }
+.j-dot.internship { background: #4ade80; }
 
 .story-section { padding: 100px 0; background: var(--white); }
 .story-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; }
@@ -768,3 +769,18 @@ li { list-style: none; }
   .teuly-chat-window { width: calc(100vw - 32px); height: calc(100vh - 110px); right: 16px; left: 16px; bottom: 90px; }
   .teuly-modal-card { width: calc(100vw - 32px); margin: 0 16px; }
 }
+
+/* Process Timeline */
+.process-timeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; position: relative; }
+.process-timeline::before { content: ''; position: absolute; top: 35px; left: 0; width: 100%; height: 2px; background: rgba(201, 168, 76, 0.2); z-index: 0; }
+.p-step { position: relative; z-index: 1; text-align: center; }
+.p-num { width: 70px; height: 70px; background: var(--gold); color: var(--navy); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 800; margin: 0 auto 2rem; border: 5px solid var(--navy); }
+.p-step h4 { margin-bottom: 1rem; font-family: var(--font-heading); font-size: 1.3rem; }
+
+@media (max-width: 768px) {
+    .process-timeline { grid-template-columns: 1fr; gap: 4rem; }
+    .process-timeline::before { display: none; }
+}
+
+.open-app-card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.open-app-card:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.05); }

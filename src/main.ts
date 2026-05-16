@@ -3,41 +3,48 @@ import './chatbot.ts'
 
 // --- Scroll Reveal ---
 const revealElements = document.querySelectorAll('.reveal');
-const observer = new IntersectionObserver((entries) => {
+const revealObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
         if (entry.isIntersecting) {
             entry.target.classList.add('active');
-            
-            // Trigger Stats Counter if applicable
-            const counters = (entry.target as HTMLElement).querySelectorAll('.count');
-            counters.forEach(counter => {
-                if (!counter.classList.contains('counted')) {
-                    animateValue(counter as HTMLElement);
-                    counter.classList.add('counted');
-                }
-            });
+            revealObserver.unobserve(entry.target);
         }
     });
 }, { threshold: 0.15 });
+revealElements.forEach(el => revealObserver.observe(el));
 
-revealElements.forEach(el => observer.observe(el));
+function animateCounter(el: HTMLElement): void {
+  const target = parseInt(el.getAttribute('data-target') || '0', 10);
+  if (isNaN(target)) return;
 
-function animateValue(obj: HTMLElement) {
-    const targetText = obj.getAttribute('data-target') || '0';
-    const target = parseInt(targetText);
-    let current = 0;
-    const duration = 2000;
-    const stepTime = Math.abs(Math.floor(duration / (target || 1)));
-    
-    const timer = setInterval(() => {
-        current += 1;
-        obj.innerText = current.toString();
-        if (current >= target) {
-            obj.innerText = target.toString();
-            clearInterval(timer);
-        }
-    }, stepTime > 0 ? stepTime : 1);
+  const duration  = 2000;
+  const stepTime  = 16;
+  const steps     = duration / stepTime;
+  const increment = target / steps;
+  const suffix    = el.getAttribute('data-suffix') || '';
+  let current     = 0;
+
+  const timer = setInterval(() => {
+    current += increment;
+    if (current >= target) {
+      current = target;
+      clearInterval(timer);
+    }
+    el.textContent = Math.floor(current) + suffix;
+  }, stepTime);
 }
+
+const counterObserver = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (entry.isIntersecting) {
+      entry.target.querySelectorAll<HTMLElement>('[data-target]').forEach(animateCounter);
+      counterObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.3 });
+
+document.querySelectorAll('.stats-section, .hero-stats, .about-stats, .services-stats')
+  .forEach((section) => counterObserver.observe(section));
 
 // --- Careers Page Specific ---
 const filterDept = document.getElementById('filter-dept') as HTMLSelectElement;
@@ -55,15 +62,26 @@ filterDept?.addEventListener('change', () => {
     });
 });
 
-const viewDetailBtns = document.querySelectorAll('.view-details');
-viewDetailBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        const drawer = btn.closest('.job-listing')?.querySelector('.job-drawer');
-        if (drawer) {
-            drawer.classList.toggle('active');
-            btn.textContent = drawer.classList.contains('active') ? 'Close Details' : 'View Details';
-        }
-    });
+function toggleJobDetails(btn: HTMLElement): void {
+  const card    = btn.closest('.job-listing') as HTMLElement;
+  const details = card.querySelector('.job-drawer') as HTMLElement;
+  const isOpen  = details.classList.contains('active');
+  
+  if (isOpen) {
+    details.classList.remove('active');
+    btn.textContent = 'View Details';
+  } else {
+    details.classList.add('active');
+    btn.textContent = 'Hide Details';
+  }
+}
+(window as any).toggleJobDetails = toggleJobDetails;
+
+document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('view-details')) {
+        toggleJobDetails(target);
+    }
 });
 
 const benefitCards = document.querySelectorAll('.benefit-card');
@@ -75,28 +93,50 @@ benefitCards.forEach(card => {
     });
 });
 
-// --- Contact Page Specific ---
+// --- Contact Form Logic ---
 const contactForm = document.getElementById('contact-form') as HTMLFormElement;
-const formSuccess = document.getElementById('form-success');
 const radioPills = document.querySelectorAll('.radio-pill');
+const methodInput = document.getElementById('contact-method-input') as HTMLInputElement;
 
 radioPills.forEach(pill => {
     pill.addEventListener('click', () => {
         radioPills.forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
+        if (methodInput) {
+            methodInput.value = pill.getAttribute('data-method') || 'phone';
+        }
     });
 });
 
-contactForm?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const btn = contactForm.querySelector('button[type="submit"]');
-    if (btn) (btn as HTMLButtonElement).innerText = 'Sending...';
-    
-    setTimeout(() => {
-        contactForm.style.display = 'none';
-        if (formSuccess) formSuccess.style.display = 'block';
-    }, 1500);
-});
+if (contactForm) {
+    contactForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = contactForm.querySelector('button[type="submit"]');
+        if (btn) (btn as HTMLButtonElement).innerText = 'Sending...';
+        
+        const formData = new FormData(contactForm);
+        
+        try {
+            const response = await fetch("/", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams(formData as any).toString(),
+            });
+
+            if (response.ok) {
+                contactForm.style.display = 'none';
+                const successMsg = document.getElementById('form-success');
+                if (successMsg) successMsg.style.display = 'block';
+            } else {
+                alert("Submission failed. Please try again.");
+                if (btn) (btn as HTMLButtonElement).innerText = 'Send Message';
+            }
+        } catch (error) {
+            alert("An error occurred. Please try again.");
+            if (btn) (btn as HTMLButtonElement).innerText = 'Send Message';
+        }
+    });
+}
 
 // Initializations
 document.addEventListener('DOMContentLoaded', () => {
