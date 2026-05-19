@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build && cd portal/client && npm run build"
+  command = "npm run build && npm --prefix portal/client ci && npm --prefix portal/client run build"
   publish = "dist"
 
 # SPA redirect for portal React app
