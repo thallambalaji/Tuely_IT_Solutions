@@ -70,7 +70,13 @@ const startServer = async () => {
       console.log('✅ MongoDB connected');
     } catch (err) {
       console.error('❌ MongoDB connection failed:', err.message);
-      process.exit(1);
+      if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+      } else {
+        console.warn('⚠️  Running in development without DB. Auth routes will not work until DB is connected.');
+        console.warn('    Fix: Check your MONGO_URI and ensure MongoDB Atlas IP whitelist includes 0.0.0.0/0');
+        console.warn('    Or use a local MongoDB: mongodb://localhost:27017/teuly_connect');
+      }
     }
   }
 

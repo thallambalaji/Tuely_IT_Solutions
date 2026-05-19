@@ -1,0 +1,15 @@
+[build]
+  command = "npm run build && cd portal/client && npm run build"
+  publish = "dist"
+
+# SPA redirect for portal React app
+[[redirects]]
+  from = "/portal/*"
+  to = "/portal/index.html"
+  status = 200
+
+# Ensure main site HTML pages don't get caught by portal redirect
+[[redirects]]
+  from = "/"
+  to = "/index.html"
+  status = 200
