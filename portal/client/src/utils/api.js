@@ -11,7 +11,10 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      window.location.href = '/portal/login';
+      // Prevent infinite reload loop if we are already on the login page
+      if (window.location.pathname !== '/portal/login' && window.location.pathname !== '/portal/login/') {
+        window.location.href = '/portal/login';
+      }
     }
     return Promise.reject(err);
   }
