@@ -784,3 +784,13 @@ li { list-style: none; }
 
 .open-app-card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
 .open-app-card:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.05); }
+
+/* Team Login Nav Link */
+.team-login-link {
+  font-size: 13px;
+  color: rgba(255,255,255,0.6);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.team-login-link:hover { color: #C9A84C; }
+

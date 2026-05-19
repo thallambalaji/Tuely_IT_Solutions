@@ -1,0 +1,159 @@
+@import '@fontsource/playfair-display/400.css';
+@import '@fontsource/playfair-display/600.css';
+@import '@fontsource/playfair-display/700.css';
+@import '@fontsource/dm-sans/400.css';
+@import '@fontsource/dm-sans/500.css';
+@import '@fontsource/dm-sans/600.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+
+  html { font-family: 'DM Sans', system-ui, sans-serif; }
+
+  body {
+    @apply bg-cream text-navy antialiased;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+
+  .dark body { background: #0D1B3E; color: white; }
+
+  h1, h2, h3, h4, h5 {
+    font-family: 'Playfair Display', Georgia, serif;
+    @apply tracking-tight;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-cream-dark; }
+  ::-webkit-scrollbar-thumb { @apply bg-navy-light rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-gold; }
+
+  ::selection { background: #C9A84C; color: #0D1B3E; }
+}
+
+@layer components {
+  /* ─── Buttons ─────────────────────────────────────────── */
+  .btn-primary {
+    @apply bg-navy text-gold font-semibold px-6 py-3 rounded-xl
+           transition-all duration-200 hover:bg-navy-mid hover:shadow-gold
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
+           flex items-center gap-2 justify-center;
+  }
+
+  .btn-secondary {
+    @apply border-2 border-navy text-navy font-semibold px-6 py-3 rounded-xl
+           transition-all duration-200 hover:bg-navy hover:text-gold
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
+           flex items-center gap-2 justify-center;
+  }
+
+  .btn-gold {
+    @apply bg-gold text-navy font-semibold px-6 py-3 rounded-xl
+           transition-all duration-200 hover:bg-gold-light hover:shadow-gold
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
+           flex items-center gap-2 justify-center;
+  }
+
+  .btn-danger {
+    @apply bg-error text-white font-semibold px-6 py-3 rounded-xl
+           transition-all duration-200 hover:opacity-90
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
+           flex items-center gap-2 justify-center;
+  }
+
+  .btn-ghost {
+    @apply text-navy font-medium px-4 py-2 rounded-xl
+           transition-all duration-200 hover:bg-navy hover:bg-opacity-5
+           active:scale-95 flex items-center gap-2;
+  }
+
+  /* ─── Cards ───────────────────────────────────────────── */
+  .card {
+    @apply bg-white rounded-2xl shadow-card p-6 transition-all duration-200;
+  }
+  .card-hover {
+    @apply card hover:shadow-card-hover hover:-translate-y-1;
+  }
+
+  /* ─── Inputs ──────────────────────────────────────────── */
+  .input {
+    @apply w-full bg-cream border border-navy border-opacity-20 rounded-xl px-4 py-3
+           text-navy placeholder-navy placeholder-opacity-40 font-body
+           focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold focus:ring-opacity-20
+           transition-all duration-200;
+  }
+
+  .label {
+    @apply block text-sm font-semibold text-navy text-opacity-70 mb-2;
+  }
+
+  /* ─── Badges ──────────────────────────────────────────── */
+  .badge-it {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold
+           bg-navy text-gold;
+  }
+  .badge-non-it {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold
+           bg-gold-soft text-navy border border-gold border-opacity-30;
+  }
+  .badge-success {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold
+           bg-green-100 text-success;
+  }
+  .badge-error {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold
+           bg-red-100 text-error;
+  }
+  .badge-warning {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold
+           bg-orange-100 text-warning;
+  }
+  .badge-gold {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold
+           bg-gold text-navy;
+  }
+  .badge-gray {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold
+           bg-gray-100 text-gray-500;
+  }
+
+  /* ─── Sidebar ─────────────────────────────────────────── */
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-white text-opacity-70
+           font-medium transition-all duration-200 cursor-pointer
+           hover:bg-white hover:bg-opacity-10 hover:text-white;
+  }
+  .sidebar-link.active {
+    @apply bg-gold text-navy font-semibold;
+  }
+
+  /* ─── Stat Cards ──────────────────────────────────────── */
+  .stat-card {
+    @apply card flex items-start gap-4;
+  }
+  .stat-icon {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0;
+  }
+
+  /* ─── Priority Badges ─────────────────────────────────── */
+  .priority-low    { @apply badge-success; }
+  .priority-medium { @apply badge-warning; }
+  .priority-high   { @apply bg-orange-200 text-orange-800 inline-flex items-center px-3 py-1 rounded-full text-xs font-bold; }
+  .priority-urgent { @apply badge-error; }
+
+  /* ─── Status Toggles ──────────────────────────────────── */
+  .status-btn {
+    @apply px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-200 cursor-pointer;
+  }
+  .status-btn.active-pending    { @apply bg-gray-100 text-gray-600 border-gray-200; }
+  .status-btn.active-inprogress { @apply bg-gold text-navy border-gold; }
+  .status-btn.active-completed  { @apply bg-success text-white border-success; }
+}
+
+/* ─── Dark Mode Overrides ─────────────────────────────────── */
+.dark .card { @apply bg-navy-mid border border-white border-opacity-10; }
+.dark .input { @apply bg-[#0D1B3E] text-white border-white border-opacity-20 placeholder-white placeholder-opacity-30; }
+.dark .label { @apply text-white text-opacity-60; }
