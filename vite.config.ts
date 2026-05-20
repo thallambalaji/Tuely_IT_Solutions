@@ -24,6 +24,14 @@ export default defineConfig({
       '/portal': {
         target: 'http://localhost:5173',
         changeOrigin: true,
+      },
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
       }
     }
   }
