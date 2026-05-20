@@ -2,6 +2,19 @@
   command = "npm run build && cd portal/client && npm install && npm run build"
   publish = "dist"
 
+# Proxy API and file upload requests to the production backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://tuely-it-solutions.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/uploads/*"
+  to = "https://tuely-it-solutions.onrender.com/uploads/:splat"
+  status = 200
+  force = true
+
 # SPA redirect for portal React app
 [[redirects]]
   from = "/portal"
