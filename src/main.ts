@@ -37,14 +37,13 @@ function animateCounter(el: HTMLElement): void {
 const counterObserver = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
     if (entry.isIntersecting) {
-      entry.target.querySelectorAll<HTMLElement>('[data-target]').forEach(animateCounter);
+      animateCounter(entry.target as HTMLElement);
       counterObserver.unobserve(entry.target);
     }
   });
-}, { threshold: 0.3 });
+}, { threshold: 0.1 });
 
-document.querySelectorAll('.stats-section, .hero-stats, .about-stats, .services-stats')
-  .forEach((section) => counterObserver.observe(section));
+document.querySelectorAll('[data-target]').forEach((el) => counterObserver.observe(el));
 
 // --- Careers Page Specific ---
 const filterDept = document.getElementById('filter-dept') as HTMLSelectElement;
