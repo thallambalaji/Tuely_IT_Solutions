@@ -174,13 +174,16 @@ router.post('/', authenticate, requireHR, (req, res, next) => {
       profilePhotoPath = `/api/files/profiles/${req.file.filename}`;
     }
 
+    // Clean rest from overrideable fields to prevent parameter pollution or casting issues
+    const { role, employeeId, profilePhoto, ...cleanRest } = rest;
+
     const user = new User({
+      ...cleanRest,
       companyEmail,
       password,
       role: 'employee',
       employeeId: finalEmployeeId,
-      profilePhoto: profilePhotoPath,
-      ...rest
+      profilePhoto: profilePhotoPath
     });
     await user.save();
 
