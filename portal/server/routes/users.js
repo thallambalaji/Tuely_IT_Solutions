@@ -52,13 +52,9 @@ const uploadResume = multer({
   storage: resumeStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
   fileFilter: (req, file, cb) => {
-    const allowedMimes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ];
     const allowedExts = ['.pdf', '.docx'];
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowedMimes.includes(file.mimetype) && allowedExts.includes(ext)) {
+    if (allowedExts.includes(ext)) {
       cb(null, true);
     } else {
       cb(new Error('Only PDF or Word (.docx) format is accepted for resume.'));
@@ -68,12 +64,20 @@ const uploadResume = multer({
 
 // ── Helper: auto-generate employee ID ─────────────────────────────
 async function generateEmployeeId() {
-  const last = await User.findOne({ role: 'employee', employeeId: { $exists: true, $ne: '' } })
-    .sort({ createdAt: -1 })
-    .select('employeeId');
-  if (!last || !last.employeeId) return 'TIS_001';
-  const num = parseInt(last.employeeId.split('_')[1]) || 0;
-  return `TIS_${String(num + 1).padStart(3, '0')}`;
+  const users = await User.find({ employeeId: { $exists: true, $ne: '' } }).select('employeeId');
+  let maxNum = 0;
+  for (const u of users) {
+    if (u.employeeId) {
+      const match = u.employeeId.match(/^TIS_(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+  }
+  return `TIS_${String(maxNum + 1).padStart(3, '0')}`;
 }
 
 // ── GET /api/users — HR: all employees | Employee: self only ──────
@@ -94,13 +98,7 @@ router.get('/', authenticate, async (req, res) => {
 // Returns the next available Employee ID without creating anything
 router.get('/next-id', authenticate, requireHR, async (req, res) => {
   try {
-    const lastEmployee = await User.findOne({ role: 'employee', employeeId: { $exists: true } })
-      .sort({ createdAt: -1 })
-      .select('employeeId');
-    const lastNum = lastEmployee && lastEmployee.employeeId
-      ? parseInt(lastEmployee.employeeId.split('_')[1], 10)
-      : 0;
-    const nextId = `TIS_${String(lastNum + 1).padStart(3, '0')}`;
+    const nextId = await generateEmployeeId();
     res.json({ employeeId: nextId });
   } catch (err) {
     res.status(500).json({ error: 'Failed to generate ID' });
@@ -320,28 +318,27 @@ router.put('/:id/change-password', authenticate, async (req, res) => {
   }
 });
 
-// ── DELETE /api/users/:id — HR only (soft delete) ─────────────────
+// ── DELETE /api/users/:id — HR only (hard delete) ─────────────────
 router.delete('/:id', authenticate, requireHR, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found.' });
 
-    user.isActive = false;
-    await user.save({ validateBeforeSave: false });
+    await User.findByIdAndDelete(req.params.id);
 
     await AuditLog.create({
       action: 'deleted',
       performedBy: req.user._id,
       targetUser: user._id,
-      details: `HR deleted account of ${user.fullName} (${user.companyEmail}). Soft-deleted; hard-delete scheduled in 24h.`,
+      details: `HR deleted account of ${user.fullName} (${user.companyEmail}).`,
     });
 
     const io = req.app.get('io');
     io?.to(user._id.toString()).emit('force_logout', {
-      message: 'Your account has been deactivated by HR.',
+      message: 'Your account has been deleted by HR.',
     });
 
-    return res.json({ message: `${user.fullName}'s account has been deactivated.` });
+    return res.json({ message: `${user.fullName}'s account has been deleted.` });
   } catch (err) {
     return res.status(500).json({ message: 'Failed to delete user.', error: err.message });
   }
