@@ -10,6 +10,7 @@ const CATEGORIES = ['Development', 'Design', 'Testing', 'Documentation', 'Meetin
 const emptyTask = () => ({ taskName: '', description: '', timeSpent: '', status: 'In Progress', category: 'Development' });
 
 export default function WorkLog() {
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [submitted, setSubmitted] = useState(false);
   const [existingLog, setExistingLog] = useState(null);
   const [tasks, setTasks] = useState([emptyTask()]);
@@ -18,23 +19,38 @@ export default function WorkLog() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const checkToday = async () => {
-      try {
-        const today = new Date().toISOString().split('T')[0];
-        const { data } = await api.get(`/work-logs?date=${today}`);
-        if (data?.[0]) {
-          setExistingLog(data[0]);
-          setSubmitted(true);
+  const fetchLogForDate = async (dateStr) => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await api.get(`/work-logs?date=${dateStr}`);
+      if (data?.[0]) {
+        setExistingLog(data[0]);
+        setSubmitted(true);
+        setTasks(data[0].tasks);
+        setNotes(data[0].notes || '');
+      } else {
+        setExistingLog(null);
+        setSubmitted(false);
+        if (dateStr === new Date().toISOString().split('T')[0]) {
+          setTasks([emptyTask()]);
+          setNotes('');
+        } else {
+          setTasks([]);
+          setNotes('');
         }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
       }
-    };
-    checkToday();
-  }, []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load work log details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogForDate(selectedDate);
+  }, [selectedDate]);
 
   const totalHours = tasks.reduce((s, t) => s + (parseFloat(t.timeSpent) || 0), 0);
 
@@ -58,7 +74,7 @@ export default function WorkLog() {
 
     setSubmitting(true);
     try {
-      const { data } = await api.post('/work-logs', { tasks: validTasks, notes });
+      const { data } = await api.post('/work-logs', { tasks: validTasks, notes, date: selectedDate });
       setExistingLog(data.log);
       setSubmitted(true);
     } catch (err) {
@@ -84,11 +100,23 @@ export default function WorkLog() {
       <Sidebar />
       <main className="ml-64 flex-1 min-h-screen bg-cream p-8 max-w-5xl">
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <p className="text-gold text-sm font-semibold tracking-widest uppercase mb-1">Daily Work Log</p>
-          <h1 className="font-heading text-navy text-4xl font-bold">
-            {new Date().toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </h1>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <p className="text-gold text-sm font-semibold tracking-widest uppercase mb-1">Daily Work Log</p>
+            <h1 className="font-heading text-navy text-4xl font-bold">
+              {new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-bold text-navy uppercase tracking-wider">Select Date:</label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              max={new Date().toISOString().split('T')[0]}
+              className="input py-1.5 px-3 text-xs w-40 shadow-sm"
+            />
+          </div>
         </motion.div>
 
         {/* Already Submitted — Locked View */}
@@ -103,10 +131,12 @@ export default function WorkLog() {
                 <p className="text-navy text-opacity-50 text-sm mt-1">
                   Submitted at {new Date(existingLog.submittedAt).toLocaleTimeString()} · {existingLog.totalHours}h total
                 </p>
-                {existingLog.lastEditedBy && (
+                {existingLog.isEditedByHR && (
                   <div className="flex items-center gap-2 mt-2 bg-gold-soft border border-gold border-opacity-30 px-3 py-2 rounded-xl inline-flex">
                     <span className="badge-gold text-xs">Edited by HR</span>
-                    <span className="text-navy text-opacity-60 text-xs">on {new Date(existingLog.lastEditedAt).toLocaleDateString()}</span>
+                    <span className="text-navy text-opacity-60 text-xs">
+                      {existingLog.lastEditedAt ? `on ${new Date(existingLog.lastEditedAt).toLocaleDateString()}` : ''}
+                    </span>
                   </div>
                 )}
               </div>
@@ -149,7 +179,7 @@ export default function WorkLog() {
         )}
 
         {/* Form — Not Yet Submitted */}
-        {!submitted && (
+        {!submitted && selectedDate === new Date().toISOString().split('T')[0] && (
           <motion.form
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -305,6 +335,15 @@ export default function WorkLog() {
               Once submitted, your log is locked. Only HR can make edits.
             </p>
           </motion.form>
+        )}
+
+        {/* Not Submitted for Past Date */}
+        {!submitted && selectedDate !== new Date().toISOString().split('T')[0] && (
+          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="card text-center py-16 text-navy text-opacity-40">
+            <Lock size={48} className="mx-auto mb-4 opacity-30 text-navy" />
+            <p className="text-lg font-heading font-bold text-navy">No Log Submitted</p>
+            <p className="text-sm mt-1">You did not submit a work log for {new Date(selectedDate).toLocaleDateString('en-IN', { month: 'long', day: 'numeric', year: 'numeric' })}.</p>
+          </motion.div>
         )}
       </main>
     </div>

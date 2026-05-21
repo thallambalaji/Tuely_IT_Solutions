@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Users, ClipboardList, Calendar, MessageCircle,
   FileText, Bell, BarChart3, LogOut, ChevronLeft, Megaphone,
-  CheckSquare, Sun, Moon, ExternalLink,
+  CheckSquare, Sun, Moon, ExternalLink, ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
@@ -19,6 +19,7 @@ const HR_NAV = [
   { icon: Megaphone,       label: 'Announcements',to: '/hr/announcements' },
   { icon: BarChart3,       label: 'Reports',      to: '/hr/reports' },
   { icon: MessageCircle,   label: 'Messages',     to: '/hr/messages' },
+  { icon: ShieldCheck,     label: 'Monitor Chats',to: '/hr/messages/monitor' },
 ];
 
 const EMP_NAV = [

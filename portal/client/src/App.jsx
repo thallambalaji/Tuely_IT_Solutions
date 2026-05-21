@@ -7,10 +7,25 @@ import Unauthorized from './pages/auth/Unauthorized';
 
 // HR Pages
 import HRDashboard from './pages/hr/HRDashboard';
+import Employees from './pages/hr/Employees';
+import HRAttendance from './pages/hr/Attendance';
+import HRLeaves from './pages/hr/Leaves';
+import HRAnnouncements from './pages/hr/Announcements';
+import HRReports from './pages/hr/Reports';
+import HRWorkLogs from './pages/hr/HRWorkLogs';
+import HRTasks from './pages/hr/HRTasks';
+import HRMessageMonitor from './pages/hr/HRMessageMonitor';
 
 // Employee Pages
 import EmployeeDashboard from './pages/employee/EmployeeDashboard';
 import WorkLog from './pages/employee/WorkLog';
+import EmployeeTasks from './pages/employee/Tasks';
+import EmployeeReports from './pages/employee/Reports';
+import EmployeeLeave from './pages/employee/Leave';
+import EmployeeProfile from './pages/employee/Profile';
+
+// Shared Pages
+import Messages from './pages/common/Messages';
 
 // Placeholder for Phase 2 pages
 const Placeholder = ({ title }) => (
@@ -33,24 +48,25 @@ export default function App() {
       <Route path="/unauthorized" element={<Unauthorized />} />
 
       {/* HR Routes */}
-      <Route path="/hr/dashboard"     element={<HRRoute><HRDashboard /></HRRoute>} />
-      <Route path="/hr/employees"     element={<HRRoute><Placeholder title="All Employees" /></HRRoute>} />
-      <Route path="/hr/tasks"         element={<HRRoute><Placeholder title="Task Assignment" /></HRRoute>} />
-      <Route path="/hr/work-logs"     element={<HRRoute><Placeholder title="Work Logs" /></HRRoute>} />
-      <Route path="/hr/attendance"    element={<HRRoute><Placeholder title="Attendance" /></HRRoute>} />
-      <Route path="/hr/leaves"        element={<HRRoute><Placeholder title="Leave Management" /></HRRoute>} />
-      <Route path="/hr/announcements" element={<HRRoute><Placeholder title="Announcements" /></HRRoute>} />
-      <Route path="/hr/reports"       element={<HRRoute><Placeholder title="Reports" /></HRRoute>} />
-      <Route path="/hr/messages"      element={<HRRoute><Placeholder title="Messages" /></HRRoute>} />
+      <Route path="/hr/dashboard"           element={<HRRoute><HRDashboard /></HRRoute>} />
+      <Route path="/hr/employees"           element={<HRRoute><Employees /></HRRoute>} />
+      <Route path="/hr/tasks"               element={<HRRoute><HRTasks /></HRRoute>} />
+      <Route path="/hr/work-logs"           element={<HRRoute><HRWorkLogs /></HRRoute>} />
+      <Route path="/hr/attendance"          element={<HRRoute><HRAttendance /></HRRoute>} />
+      <Route path="/hr/leaves"              element={<HRRoute><HRLeaves /></HRRoute>} />
+      <Route path="/hr/announcements"       element={<HRRoute><HRAnnouncements /></HRRoute>} />
+      <Route path="/hr/reports"             element={<HRRoute><HRReports /></HRRoute>} />
+      <Route path="/hr/messages"            element={<HRRoute><Messages /></HRRoute>} />
+      <Route path="/hr/messages/monitor"    element={<HRRoute><HRMessageMonitor /></HRRoute>} />
 
       {/* Employee Routes */}
       <Route path="/employee/dashboard" element={<EmployeeRoute><EmployeeDashboard /></EmployeeRoute>} />
       <Route path="/employee/work-log"  element={<EmployeeRoute><WorkLog /></EmployeeRoute>} />
-      <Route path="/employee/tasks"     element={<EmployeeRoute><Placeholder title="My Tasks" /></EmployeeRoute>} />
-      <Route path="/employee/reports"   element={<EmployeeRoute><Placeholder title="My Reports" /></EmployeeRoute>} />
-      <Route path="/employee/leave"     element={<EmployeeRoute><Placeholder title="Leave Requests" /></EmployeeRoute>} />
-      <Route path="/employee/messages"  element={<EmployeeRoute><Placeholder title="Messages" /></EmployeeRoute>} />
-      <Route path="/employee/profile"   element={<EmployeeRoute><Placeholder title="My Profile" /></EmployeeRoute>} />
+      <Route path="/employee/tasks"     element={<EmployeeRoute><EmployeeTasks /></EmployeeRoute>} />
+      <Route path="/employee/reports"   element={<EmployeeRoute><EmployeeReports /></EmployeeRoute>} />
+      <Route path="/employee/leave"     element={<EmployeeRoute><EmployeeLeave /></EmployeeRoute>} />
+      <Route path="/employee/messages"  element={<EmployeeRoute><Messages /></EmployeeRoute>} />
+      <Route path="/employee/profile"   element={<EmployeeRoute><EmployeeProfile /></EmployeeRoute>} />
 
       {/* Default */}
       <Route path="/" element={<Navigate to="/login" replace />} />

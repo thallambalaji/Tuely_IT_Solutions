@@ -37,12 +37,12 @@ const seed = async () => {
   await mongoose.connect(process.env.MONGO_URI);
   console.log('✅ Connected to MongoDB');
 
+  // Delete existing seed users to ensure fresh, correct credentials
+  await User.deleteMany({
+    companyEmail: { $in: SEED_DATA.map(d => d.companyEmail) }
+  });
+
   for (const data of SEED_DATA) {
-    const existing = await User.findOne({ companyEmail: data.companyEmail });
-    if (existing) {
-      console.log(`⚠️  User already exists: ${data.companyEmail}`);
-      continue;
-    }
     const user = new User(data); // pre-save hook hashes password
     await user.save();
     console.log(`✅ Created: ${data.fullName} (${data.role}) — ${data.companyEmail}`);

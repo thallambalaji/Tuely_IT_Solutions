@@ -9,6 +9,7 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { Sidebar } from '../../components/common/Sidebar';
+import { Header } from '../../components/common/Header';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
@@ -113,20 +114,7 @@ export default function HRDashboard() {
       <Sidebar />
       <main className="ml-64 flex-1 min-h-screen bg-cream p-8">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <p className="text-gold text-sm font-semibold tracking-widest uppercase mb-1">
-            {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
-          <h1 className="font-heading text-navy text-4xl font-bold">
-            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},{' '}
-            <span className="text-gold">{user?.fullName?.split(' ')[0]}</span>
-          </h1>
-          <p className="text-navy text-opacity-50 mt-1">Here's your team overview for today.</p>
-        </motion.div>
+        <Header title={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, ${user?.fullName?.split(' ')[0]}`} />
 
         {/* Stat Cards */}
         <motion.div
