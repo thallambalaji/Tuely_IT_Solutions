@@ -7,7 +7,7 @@ import api from '../../utils/api';
 const STATUS_OPTIONS = ['Completed', 'In Progress', 'Blocked'];
 const CATEGORIES = ['Development', 'Design', 'Testing', 'Documentation', 'Meeting', 'Support', 'Other'];
 
-const emptyTask = () => ({ taskName: '', description: '', timeSpent: '', status: 'In Progress', category: 'Development' });
+const emptyTask = () => ({ taskName: '', description: '', timeSpent: '', status: 'In Progress', category: 'Development', isOther: false });
 
 export default function WorkLog() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -18,6 +18,27 @@ export default function WorkLog() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [assignedTasks, setAssignedTasks] = useState([]);
+
+  useEffect(() => {
+    const fetchAssignedTasks = async () => {
+      try {
+        const { data } = await api.get('/tasks');
+        setAssignedTasks(data || []);
+      } catch (err) {
+        console.error('Error fetching assigned tasks:', err);
+      }
+    };
+    fetchAssignedTasks();
+  }, []);
+
+  const handleDropdownChange = (i, value) => {
+    if (value === 'Other') {
+      setTasks(t => t.map((task, idx) => idx === i ? { ...task, taskName: '', isOther: true } : task));
+    } else {
+      setTasks(t => t.map((task, idx) => idx === i ? { ...task, taskName: value, isOther: false } : task));
+    }
+  };
 
   const fetchLogForDate = async (dateStr) => {
     setLoading(true);
@@ -197,8 +218,10 @@ export default function WorkLog() {
 
             {/* Task Entries */}
             <AnimatePresence>
-              {tasks.map((task, i) => (
-                <motion.div
+              {tasks.map((task, i) => {
+                const isOther = task.isOther || (task.taskName && !assignedTasks.some(at => at.title === task.taskName));
+                return (
+                  <motion.div
                   key={i}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -223,13 +246,33 @@ export default function WorkLog() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="sm:col-span-2">
                       <label className="label">Task Name *</label>
-                      <input
-                        className="input"
-                        value={task.taskName}
-                        onChange={e => updateTask(i, 'taskName', e.target.value)}
-                        placeholder="What did you work on?"
-                        required
-                      />
+                      <div className={isOther ? "grid grid-cols-1 md:grid-cols-2 gap-4" : ""}>
+                        <div className={isOther ? "" : "w-full"}>
+                          <select
+                            className="input"
+                            value={isOther ? 'Other' : (task.taskName || '')}
+                            onChange={e => handleDropdownChange(i, e.target.value)}
+                            required
+                          >
+                            <option value="" disabled>Select a task...</option>
+                            {assignedTasks.map(at => (
+                              <option key={at._id} value={at.title}>{at.title}</option>
+                            ))}
+                            <option value="Other">Other (Write manually)</option>
+                          </select>
+                        </div>
+                        {isOther && (
+                          <div>
+                            <input
+                              className="input"
+                              value={task.taskName}
+                              onChange={e => updateTask(i, 'taskName', e.target.value)}
+                              placeholder="Type task name manually..."
+                              required
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="sm:col-span-2">
                       <label className="label">Description</label>
@@ -283,8 +326,9 @@ export default function WorkLog() {
                       </div>
                     </div>
                   </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
 
             {/* Add Task Button */}

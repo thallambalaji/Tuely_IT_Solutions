@@ -55,8 +55,21 @@ export default function HRTasks() {
   const [selectedTask, setSelectedTask] = useState(null);
 
   // Forms
-  const [assignForm, setAssignForm] = useState({ assignedTo: '', title: '', description: '', priority: 'Medium', dueDate: '' });
+  const [assignForm, setAssignForm] = useState({ assignedTo: '' });
+  const [tasksToAssign, setTasksToAssign] = useState([{ title: '', description: '', priority: 'Medium', dueDate: '' }]);
   const [editForm, setEditForm] = useState({});
+
+  const addTaskToAssign = () => {
+    setTasksToAssign(prev => [...prev, { title: '', description: '', priority: 'Medium', dueDate: '' }]);
+  };
+
+  const removeTaskToAssign = (idx) => {
+    setTasksToAssign(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const updateTaskToAssign = (idx, field, value) => {
+    setTasksToAssign(prev => prev.map((t, i) => i === idx ? { ...t, [field]: value } : t));
+  };
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -100,16 +113,34 @@ export default function HRTasks() {
 
   const handleAssignTask = async (e) => {
     e.preventDefault();
+    if (!assignForm.assignedTo) {
+      setError('Please select an employee.');
+      return;
+    }
+    const invalidTask = tasksToAssign.find(t => !t.title.trim() || !t.dueDate);
+    if (invalidTask) {
+      setError('All tasks must have a title and due date.');
+      return;
+    }
+
     setError('');
     setActionLoading(true);
     try {
-      await api.post('/tasks', assignForm);
+      const payload = tasksToAssign.map(t => ({
+        assignedTo: assignForm.assignedTo,
+        title: t.title.trim(),
+        description: t.description.trim(),
+        priority: t.priority,
+        dueDate: t.dueDate
+      }));
+      await api.post('/tasks', payload);
       setShowAssignModal(false);
-      setAssignForm({ assignedTo: '', title: '', description: '', priority: 'Medium', dueDate: '' });
+      setAssignForm({ assignedTo: '' });
+      setTasksToAssign([{ title: '', description: '', priority: 'Medium', dueDate: '' }]);
       fetchAll();
-      showToast('Task assigned successfully.');
+      showToast('Tasks assigned successfully.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to assign task.');
+      setError(err.response?.data?.message || 'Failed to assign tasks.');
     } finally {
       setActionLoading(false);
     }
@@ -318,15 +349,16 @@ export default function HRTasks() {
           {showAssignModal && (
             <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.4 }} exit={{ opacity: 0 }} onClick={() => setShowAssignModal(false)} className="fixed inset-0 bg-navy" />
-              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="card relative z-50 w-full max-w-lg">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="font-heading text-navy text-xl font-bold flex items-center gap-2"><Plus className="text-gold" size={22} /> Assign New Task</h2>
+              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="card relative z-50 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-6 sticky top-0 bg-white z-10 py-2 border-b border-navy/10">
+                  <h2 className="font-heading text-navy text-xl font-bold flex items-center gap-2"><Plus className="text-gold" size={22} /> Assign Tasks</h2>
                   <button onClick={() => setShowAssignModal(false)} className="p-2 hover:bg-cream rounded-full"><X size={18} /></button>
                 </div>
                 {error && <div className="bg-red-50 text-error text-sm px-3 py-2 rounded-xl mb-4 flex items-center gap-2"><AlertCircle size={14} />{error}</div>}
-                <form onSubmit={handleAssignTask} className="space-y-4">
+                
+                <form onSubmit={handleAssignTask} className="space-y-6">
                   <div>
-                    <label className="label">Assign To *</label>
+                    <label className="label font-bold text-navy text-sm">Assign To *</label>
                     <select required className="input" value={assignForm.assignedTo}
                       onChange={e => setAssignForm(f => ({ ...f, assignedTo: e.target.value }))}>
                       <option value="">Select Employee</option>
@@ -335,40 +367,65 @@ export default function HRTasks() {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="label">Task Name *</label>
-                    <input required type="text" className="input" value={assignForm.title}
-                      onChange={e => setAssignForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Update CRM database" />
+
+                  <div className="space-y-4">
+                    <p className="font-heading font-bold text-navy text-base">Task List</p>
+                    
+                    {tasksToAssign.map((task, idx) => (
+                      <div key={idx} className="border border-navy/10 rounded-2xl p-4 bg-cream/30 space-y-4 relative">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-navy/50 uppercase tracking-wider">Task #{idx + 1}</span>
+                          {tasksToAssign.length > 1 && (
+                            <button type="button" onClick={() => removeTaskToAssign(idx)} className="p-1 hover:bg-red-50 rounded-lg text-navy/40 hover:text-error transition-colors">
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="sm:col-span-2">
+                            <label className="label">Task Name *</label>
+                            <input required type="text" className="input text-sm" value={task.title}
+                              onChange={e => updateTaskToAssign(idx, 'title', e.target.value)} placeholder="e.g. Update CRM database" />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="label">Description</label>
+                            <textarea rows={2} className="input text-sm resize-none" value={task.description}
+                              onChange={e => updateTaskToAssign(idx, 'description', e.target.value)} placeholder="Describe what needs to be done..." />
+                          </div>
+                          <div>
+                            <label className="label">Priority</label>
+                            <div className="flex gap-1.5 flex-wrap">
+                              {PRIORITIES.map(p => {
+                                const s = PRIORITY_STYLES[p];
+                                return (
+                                  <button key={p} type="button"
+                                    onClick={() => updateTaskToAssign(idx, 'priority', p)}
+                                    className={`px-2 py-1 rounded-lg text-[10px] font-bold border-2 transition-all flex items-center gap-1 ${task.priority === p ? `${s.bg} ${s.text} border-current` : 'border-navy/10 text-navy/50 hover:border-navy/30'}`}>
+                                    {p}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="label">Due Date *</label>
+                            <input required type="date" className="input text-sm" value={task.dueDate}
+                              min={new Date().toISOString().split('T')[0]}
+                              onChange={e => updateTaskToAssign(idx, 'dueDate', e.target.value)} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <button type="button" onClick={addTaskToAssign} className="w-full border-2 border-dashed border-navy/20 hover:border-gold hover:text-gold text-navy/50 font-bold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors text-sm">
+                      <Plus size={16} /> Add Another Task
+                    </button>
                   </div>
-                  <div>
-                    <label className="label">Description *</label>
-                    <textarea required rows={3} className="input resize-none" value={assignForm.description}
-                      onChange={e => setAssignForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe what needs to be done..." />
-                  </div>
-                  <div>
-                    <label className="label">Priority</label>
-                    <div className="flex gap-2 flex-wrap">
-                      {PRIORITIES.map(p => {
-                        const s = PRIORITY_STYLES[p];
-                        return (
-                          <button key={p} type="button"
-                            onClick={() => setAssignForm(f => ({ ...f, priority: p }))}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all flex items-center gap-1.5 ${assignForm.priority === p ? `${s.bg} ${s.text} border-current` : 'border-navy/10 text-navy/50 hover:border-navy/30'}`}>
-                            {p}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="label">Due Date *</label>
-                    <input required type="date" className="input" value={assignForm.dueDate}
-                      min={new Date().toISOString().split('T')[0]}
-                      onChange={e => setAssignForm(f => ({ ...f, dueDate: e.target.value }))} />
-                  </div>
-                  <div className="flex gap-3 pt-2">
+
+                  <div className="flex gap-3 pt-4 border-t border-navy/10 sticky bottom-0 bg-white z-10 py-2">
                     <button type="submit" disabled={actionLoading} className="btn-gold flex-1">
-                      {actionLoading ? <Loader2 size={16} className="animate-spin" /> : <><Check size={16} /> Assign Task</>}
+                      {actionLoading ? <Loader2 size={16} className="animate-spin" /> : <><Check size={16} /> Assign Task(s)</>}
                     </button>
                     <button type="button" onClick={() => setShowAssignModal(false)} className="btn-secondary flex-1">Cancel</button>
                   </div>

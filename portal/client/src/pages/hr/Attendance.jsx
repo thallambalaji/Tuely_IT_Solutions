@@ -17,8 +17,10 @@ export default function HRAttendance() {
   const [notes, setNotes] = useState({}); // keyed by employeeId
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [saveStatus, setSaveStatus] = useState({}); // keyed by employeeId: 'saving' | 'saved' | 'error'
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const [originalAttendance, setOriginalAttendance] = useState({});
+  const [originalNotes, setOriginalNotes] = useState({});
+  const [savingAll, setSavingAll] = useState(false);
   
   // Date and View Configuration
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -36,7 +38,6 @@ export default function HRAttendance() {
     if (unsavedChanges && !window.confirm('You have unsaved changes. Proceed and lose them?')) return;
     setLoading(true);
     setHasLoaded(true);
-    setUnsavedChanges(false);
     try {
       if (viewMode === 'daily') {
         const [usersRes, attendanceRes] = await Promise.all([
@@ -54,11 +55,15 @@ export default function HRAttendance() {
         });
         setAttendance(attMap);
         setNotes(notesMap);
+        setOriginalAttendance(attMap);
+        setOriginalNotes(notesMap);
+        setUnsavedChanges(false);
       } else {
         const usersRes = await api.get('/users');
         setEmployees(usersRes.data.filter(u => u.role === 'employee'));
         const attendanceRes = await api.get(`/attendance?month=${selectedMonth}&year=${selectedYear}`);
         setMonthlyLogs(attendanceRes.data);
+        setUnsavedChanges(false);
       }
     } catch (err) {
       console.error('Error fetching attendance:', err);
@@ -80,38 +85,52 @@ export default function HRAttendance() {
   const fetchMonthlyData = handleLoadEmployees;
 
   // Mark/save attendance
-  const handleMarkStatus = async (employeeId, status) => {
-    setSaveStatus(prev => ({ ...prev, [employeeId]: 'saving' }));
+  const handleMarkStatus = (employeeId, status) => {
     setAttendance(prev => ({ ...prev, [employeeId]: status }));
-    setUnsavedChanges(false);
+    setUnsavedChanges(true);
+  };
 
+  const handleNoteChange = (employeeId, noteValue) => {
+    setNotes(prev => ({ ...prev, [employeeId]: noteValue }));
+    setUnsavedChanges(true);
+  };
+
+  const handleSaveAllAttendance = async () => {
+    setSavingAll(true);
     try {
+      const records = employees
+        .filter(emp => attendance[emp._id])
+        .map(emp => ({
+          employeeId: emp._id,
+          status: attendance[emp._id],
+          notes: notes[emp._id] || ''
+        }));
+
+      if (records.length === 0) {
+        alert('No attendance records have been marked.');
+        setSavingAll(false);
+        return;
+      }
+
       await api.post('/attendance', {
         date: selectedDate,
-        records: [{ employeeId, status, notes: notes[employeeId] || '' }]
+        records
       });
-      setSaveStatus(prev => ({ ...prev, [employeeId]: 'saved' }));
-      setTimeout(() => setSaveStatus(prev => ({ ...prev, [employeeId]: null })), 1500);
+
+      setOriginalAttendance({ ...attendance });
+      setOriginalNotes({ ...notes });
+      setUnsavedChanges(false);
+      alert('Attendance saved successfully!');
     } catch (err) {
-      setSaveStatus(prev => ({ ...prev, [employeeId]: 'error' }));
+      console.error('Error saving attendance:', err);
+      alert(err.response?.data?.message || 'Failed to save attendance. Please try again.');
+    } finally {
+      setSavingAll(false);
     }
   };
 
-  // Blur handler to save notes
-  const handleSaveNotes = async (employeeId, noteValue) => {
-    if (attendance[employeeId] === '') return;
-    setSaveStatus(prev => ({ ...prev, [employeeId]: 'saving' }));
-    setUnsavedChanges(false);
-    try {
-      await api.post('/attendance', {
-        date: selectedDate,
-        records: [{ employeeId, status: attendance[employeeId], notes: noteValue }]
-      });
-      setSaveStatus(prev => ({ ...prev, [employeeId]: 'saved' }));
-      setTimeout(() => setSaveStatus(prev => ({ ...prev, [employeeId]: null })), 1500);
-    } catch (err) {
-      setSaveStatus(prev => ({ ...prev, [employeeId]: 'error' }));
-    }
+  const hasRowChanged = (empId) => {
+    return attendance[empId] !== originalAttendance[empId] || notes[empId] !== originalNotes[empId];
   };
 
   // Export via server
@@ -193,7 +212,10 @@ export default function HRAttendance() {
           {/* Switch Daily vs Monthly */}
           <div className="flex bg-white rounded-xl shadow-card p-1">
             <button
-              onClick={() => setViewMode('daily')}
+              onClick={() => {
+                if (unsavedChanges && !window.confirm('You have unsaved changes. Proceed and lose them?')) return;
+                setViewMode('daily');
+              }}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                 viewMode === 'daily' ? 'bg-navy text-gold shadow-sm' : 'text-navy text-opacity-65 hover:bg-cream'
               }`}
@@ -201,7 +223,10 @@ export default function HRAttendance() {
               Daily Attendance
             </button>
             <button
-              onClick={() => setViewMode('monthly')}
+              onClick={() => {
+                if (unsavedChanges && !window.confirm('You have unsaved changes. Proceed and lose them?')) return;
+                setViewMode('monthly');
+              }}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                 viewMode === 'monthly' ? 'bg-navy text-gold shadow-sm' : 'text-navy text-opacity-65 hover:bg-cream'
               }`}
@@ -218,7 +243,10 @@ export default function HRAttendance() {
                 <input
                   type="date"
                   value={selectedDate}
-                  onChange={e => setSelectedDate(e.target.value)}
+                  onChange={e => {
+                    if (unsavedChanges && !window.confirm('You have unsaved changes. Proceed and lose them?')) return;
+                    setSelectedDate(e.target.value);
+                  }}
                   className="bg-transparent border-none text-navy font-semibold text-sm outline-none cursor-pointer"
                 />
               </div>
@@ -227,7 +255,10 @@ export default function HRAttendance() {
                 {/* Month Dropdown */}
                 <select
                   value={selectedMonth}
-                  onChange={e => setSelectedMonth(Number(e.target.value))}
+                  onChange={e => {
+                    if (unsavedChanges && !window.confirm('You have unsaved changes. Proceed and lose them?')) return;
+                    setSelectedMonth(Number(e.target.value));
+                  }}
                   className="input font-semibold bg-white border border-navy border-opacity-15 shadow-sm py-2"
                 >
                   {Array.from({ length: 12 }, (_, i) => (
@@ -240,7 +271,10 @@ export default function HRAttendance() {
                 {/* Year Dropdown */}
                 <select
                   value={selectedYear}
-                  onChange={e => setSelectedYear(Number(e.target.value))}
+                  onChange={e => {
+                    if (unsavedChanges && !window.confirm('You have unsaved changes. Proceed and lose them?')) return;
+                    setSelectedYear(Number(e.target.value));
+                  }}
                   className="input font-semibold bg-white border border-navy border-opacity-15 shadow-sm py-2"
                 >
                   {[selectedYear - 1, selectedYear, selectedYear + 1].map(y => (
@@ -254,6 +288,16 @@ export default function HRAttendance() {
             <button onClick={handleLoadEmployees} disabled={loading} className="btn-primary py-2 px-5 flex items-center gap-2">
               {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Load Employees
             </button>
+            {/* Save Attendance Button */}
+            {viewMode === 'daily' && hasLoaded && employees.length > 0 && (
+              <button
+                onClick={handleSaveAllAttendance}
+                disabled={savingAll || !unsavedChanges}
+                className="btn-gold py-2 px-5 flex items-center gap-2 text-sm"
+              >
+                {savingAll ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Save Attendance
+              </button>
+            )}
             {/* Export buttons */}
             {hasLoaded && employees.length > 0 && (
               <div className="flex gap-2">
@@ -314,7 +358,7 @@ export default function HRAttendance() {
                   <th className="p-4 font-heading text-navy font-bold text-sm">Department</th>
                   <th className="p-4 font-heading text-navy font-bold text-sm">Mark Status</th>
                   <th className="p-4 font-heading text-navy font-bold text-sm">Audit Notes</th>
-                  <th className="p-4 font-heading text-navy font-bold text-sm text-right">Saving Status</th>
+                  <th className="p-4 font-heading text-navy font-bold text-sm text-right">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -325,7 +369,6 @@ export default function HRAttendance() {
                 ) : (
                   filteredEmployees.map(emp => {
                     const status = attendance[emp._id] || '';
-                    const saveState = saveStatus[emp._id];
 
                     return (
                       <tr key={emp._id} className="border-b border-navy border-opacity-5 hover:bg-navy hover:bg-opacity-[0.01]">
@@ -383,29 +426,34 @@ export default function HRAttendance() {
                             placeholder="Add memo/notes..."
                             value={notes[emp._id] || ''}
                             disabled={!status}
-                            onChange={e => setNotes(prev => ({ ...prev, [emp._id]: e.target.value }))}
-                            onBlur={e => handleSaveNotes(emp._id, e.target.value)}
+                            onChange={e => handleNoteChange(emp._id, e.target.value)}
                             className="w-full bg-cream border-none rounded-lg px-3 py-1.5 text-xs text-navy placeholder-navy placeholder-opacity-35 outline-none focus:ring-1 focus:ring-gold disabled:opacity-50"
                           />
                         </td>
 
-                        {/* Save status check */}
+                        {/* Status Check / Unsaved status */}
                         <td className="p-4 text-right">
                           <AnimatePresence mode="wait">
-                            {saveState === 'saving' && (
-                              <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-xs text-navy text-opacity-40 flex items-center justify-end gap-1 font-semibold">
-                                <Loader2 size={12} className="animate-spin text-gold" /> Saving
+                            {hasRowChanged(emp._id) ? (
+                              <motion.span
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="text-xs text-gold font-semibold flex items-center justify-end gap-1"
+                              >
+                                <span className="w-2 h-2 rounded-full bg-gold animate-pulse" /> Unsaved
                               </motion.span>
-                            )}
-                            {saveState === 'saved' && (
-                              <motion.span initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} className="text-xs text-success flex items-center justify-end gap-1 font-semibold">
-                                <Check size={12} /> Saved
-                              </motion.span>
-                            )}
-                            {saveState === 'error' && (
-                              <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-xs text-error flex items-center justify-end gap-1 font-semibold">
-                                <AlertCircle size={12} /> Failed
-                              </motion.span>
+                            ) : (
+                              attendance[emp._id] && (
+                                <motion.span
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  exit={{ opacity: 0 }}
+                                  className="text-xs text-success flex items-center justify-end gap-1 font-semibold"
+                                >
+                                  <Check size={12} /> Saved
+                                </motion.span>
+                              )
                             )}
                           </AnimatePresence>
                         </td>

@@ -28,26 +28,49 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/tasks — HR only: assign task
+// POST /api/tasks — HR only: assign task(s)
 router.post('/', authenticate, requireHR, async (req, res) => {
   try {
-    const task = new Task({ ...req.body, assignedBy: req.user._id });
-    await task.save();
-    await task.populate('assignedTo', 'fullName firstName lastName employeeId');
-
     const io = req.app.get('io');
-    // Socket emit to employee
-    io?.to(task.assignedTo._id.toString()).emit('task_assigned', { task });
-    // Save notification for offline delivery
-    await Notification.create({
-      recipient: task.assignedTo._id,
-      type: 'task_assigned',
-      message: `HR assigned you a new task: "${task.title}"`,
-      link: '/employee/tasks',
-      icon: 'clipboard',
-    });
+    
+    if (Array.isArray(req.body)) {
+      const createdTasks = [];
+      for (const t of req.body) {
+        const task = new Task({ ...t, assignedBy: req.user._id });
+        await task.save();
+        await task.populate('assignedTo', 'fullName firstName lastName employeeId');
+        createdTasks.push(task);
 
-    return res.status(201).json({ message: 'Task assigned.', task });
+        // Socket emit to employee
+        io?.to(task.assignedTo._id.toString()).emit('task_assigned', { task });
+        // Save notification for offline delivery
+        await Notification.create({
+          recipient: task.assignedTo._id,
+          type: 'task_assigned',
+          message: `HR assigned you a new task: "${task.title}"`,
+          link: '/employee/tasks',
+          icon: 'clipboard',
+        });
+      }
+      return res.status(201).json({ message: 'Tasks assigned.', tasks: createdTasks });
+    } else {
+      const task = new Task({ ...req.body, assignedBy: req.user._id });
+      await task.save();
+      await task.populate('assignedTo', 'fullName firstName lastName employeeId');
+
+      // Socket emit to employee
+      io?.to(task.assignedTo._id.toString()).emit('task_assigned', { task });
+      // Save notification for offline delivery
+      await Notification.create({
+        recipient: task.assignedTo._id,
+        type: 'task_assigned',
+        message: `HR assigned you a new task: "${task.title}"`,
+        link: '/employee/tasks',
+        icon: 'clipboard',
+      });
+
+      return res.status(201).json({ message: 'Task assigned.', task });
+    }
   } catch (err) {
     return res.status(500).json({ message: 'Failed to assign task.', error: err.message });
   }
