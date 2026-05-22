@@ -22,7 +22,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    const user = await User.findOne({ companyEmail: companyEmail.toLowerCase().trim() });
+    const user = await User.findOne({ companyEmail: companyEmail.toLowerCase().trim() }).select('+password');
 
     // Generic error — never specify which field is wrong (security best practice)
     if (!user || !user.isActive) {

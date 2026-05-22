@@ -292,9 +292,8 @@ export default function EmployeeProfile() {
   const handleResumeUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const allowed = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     const ext = file.name.split('.').pop().toLowerCase();
-    if (!allowed.includes(file.type) || !['pdf', 'docx'].includes(ext)) {
+    if (!['pdf', 'docx'].includes(ext)) {
       alert('Only PDF or Word (.docx) format is accepted for resume.');
       return;
     }

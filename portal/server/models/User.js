@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
   // ── Contact ───────────────────────────────────────────────────────
   personalEmail:    { type: String, trim: true, lowercase: true },
   companyEmail:     { type: String, required: true, unique: true, trim: true, lowercase: true },
-  password:         { type: String, required: true, minlength: 6 },
+  password:         { type: String, required: true, minlength: 6, select: false },
   phone:            { type: String, trim: true },
   alternatePhone:   { type: String, trim: true },
   address: {

@@ -38,21 +38,21 @@ router.get('/:folder/:filename', authenticate, async (req, res) => {
 
     // Employee file access rules
     if (req.user.role === 'employee') {
-      if (folder === 'profiles' || folder === 'resumes') {
-        // Employees can access files that start with their own userId OR are their own
+      if (folder === 'resumes') {
+        // Employees can only access their own resumes
         const fileOwnerPrefix = req.user._id.toString();
         if (!filename.startsWith(fileOwnerPrefix)) {
           // Check if the file belongs to this employee in the DB
-          const user = await User.findById(req.user._id).select('profilePhoto resumeUrl');
-          const allowedPaths = [user.profilePhoto, user.resumeUrl]
+          const user = await User.findById(req.user._id).select('resumeUrl');
+          const allowedPaths = [user.resumeUrl]
             .filter(Boolean)
             .map(p => path.basename(p));
           if (!allowedPaths.includes(filename)) {
-            return res.status(403).json({ error: 'Access denied. You can only access your own files.' });
+            return res.status(403).json({ error: 'Access denied. You can only access your own resume.' });
           }
         }
       }
-      // Attachments: any authenticated user can access (for chat messages)
+      // profiles and attachments: any authenticated user can access (for profile photo and chat)
     }
 
     return res.sendFile(filePath);
