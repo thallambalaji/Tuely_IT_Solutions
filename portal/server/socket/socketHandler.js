@@ -77,6 +77,66 @@ const socketHandler = (io) => {
       if (conversationId) socket.join(conversationId);
     });
 
+    // ── Real-Time Attachment Sharing Events ───────────────────────
+    socket.on('send_attachment', async ({ conversationId, attachmentId, isGroup }) => {
+      try {
+        const Attachment = require('../models/Attachment');
+        const attachment = await Attachment.findById(attachmentId);
+        if (!attachment) return;
+        const roomId = isGroup ? `group_${conversationId}` : conversationId;
+        io.to(roomId).emit('receive_attachment', { attachment, conversationId });
+      } catch (err) {
+        console.error('send_attachment error:', err.message);
+      }
+    });
+
+    socket.on('attachment_delivered', async ({ attachmentId }) => {
+      try {
+        const Attachment = require('../models/Attachment');
+        const attachment = await Attachment.findByIdAndUpdate(attachmentId, { deliveredStatus: true }, { new: true });
+        if (attachment) {
+          io.to(attachment.senderId.toString()).emit('attachment_delivered', { attachmentId });
+        }
+      } catch (err) {
+        console.error('attachment_delivered error:', err.message);
+      }
+    });
+
+    socket.on('attachment_seen', async ({ attachmentId }) => {
+      try {
+        const Attachment = require('../models/Attachment');
+        const attachment = await Attachment.findByIdAndUpdate(
+          attachmentId,
+          { seenStatus: true, seenAt: new Date() },
+          { new: true }
+        );
+        if (attachment) {
+          io.to(attachment.senderId.toString()).emit('attachment_seen', { attachmentId });
+        }
+      } catch (err) {
+        console.error('attachment_seen error:', err.message);
+      }
+    });
+
+    socket.on('attachment_downloaded', async ({ attachmentId }) => {
+      try {
+        const Attachment = require('../models/Attachment');
+        const attachment = await Attachment.findById(attachmentId);
+        if (attachment) {
+          const roomId = attachment.groupId ? `group_${attachment.groupId}` : attachment.channelId;
+          if (roomId) {
+            socket.to(roomId.toString()).emit('attachment_downloaded', {
+              attachmentId,
+              userId: socket.user._id,
+              userName: socket.user.fullName
+            });
+          }
+        }
+      } catch (err) {
+        console.error('attachment_downloaded error:', err.message);
+      }
+    });
+
     socket.on('send_message', async ({ conversationId, content, type = 'text', attachmentUrl = '', attachmentName = '' }) => {
       try {
         // XSS: strip HTML tags from text content
@@ -197,7 +257,7 @@ const socketHandler = (io) => {
         if (!group || group.deletedAt) return;
 
         // Verify membership (HR can always send)
-        if (socket.user.role !== 'hr' && !group.members.includes(socket.user._id)) {
+        if (socket.user.role !== 'hr' && !group.members.some(m => m.equals(socket.user._id))) {
           return socket.emit('error', { message: 'You are not a member of this group.' });
         }
 

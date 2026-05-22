@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Sidebar } from '../../components/common/Sidebar';
 import { useSocket } from '../../context/SocketContext';
-import api from '../../utils/api';
+import api, { getFullUrl } from '../../utils/api';
 
 const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
 const PRIORITY_STYLES = {
@@ -287,7 +287,7 @@ export default function HRTasks() {
                     {/* Assigned employee */}
                     <div className="flex items-center gap-2">
                       {emp?.profilePhoto
-                        ? <img src={emp.profilePhoto} className="w-7 h-7 rounded-full object-cover" />
+                        ? <img src={getFullUrl(emp.profilePhoto)} className="w-7 h-7 rounded-full object-cover" />
                         : <InitialsAvatar name={emp?.fullName} size={28} />
                       }
                       <span className="text-xs font-medium text-navy/70 truncate max-w-[100px]">{emp?.fullName}</span>

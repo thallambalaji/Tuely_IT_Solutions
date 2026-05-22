@@ -6,7 +6,7 @@ import { Sidebar } from '../../components/common/Sidebar';
 import { Header } from '../../components/common/Header';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
-import api from '../../utils/api';
+import api, { getFullUrl } from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
@@ -101,7 +101,7 @@ export default function EmployeeDashboard() {
             <div className="relative group">
               <div className="w-[100px] h-[100px] rounded-full bg-navy flex items-center justify-center text-gold font-heading font-bold text-4xl shadow-lg overflow-hidden border-2 border-gold border-opacity-35">
                 {user?.profilePhoto
-                  ? <img src={user.profilePhoto} alt={user.fullName} className="w-full h-full object-cover" />
+                  ? <img src={getFullUrl(user.profilePhoto)} alt={user.fullName} className="w-full h-full object-cover" />
                   : user?.fullName?.[0]
                 }
               </div>

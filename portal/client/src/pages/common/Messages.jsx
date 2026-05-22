@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquare, Send, Users, UserPlus, Info, CheckCheck, Check,
   Loader2, X, PlusCircle, Laptop, Paperclip, Search, Settings,
-  Trash2, FileText, ChevronRight, AlertCircle
+  Trash2, FileText, ChevronRight, AlertCircle, Download, Play, Pause, Music, File, FileCode, Eye
 } from 'lucide-react';
 import { Sidebar } from '../../components/common/Sidebar';
 import { Header } from '../../components/common/Header';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
-import api from '../../utils/api';
+import api, { API_BASE_URL, getFullUrl } from '../../utils/api';
+
 
 export default function Messages() {
   const { user } = useAuth();
@@ -41,6 +42,9 @@ export default function Messages() {
   // Attachment upload states
   const [attachment, setAttachment] = useState(null); // { url, filename, type }
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
+  const [uploadingFileName, setUploadingFileName] = useState('');
+  const [activePreviewImage, setActivePreviewImage] = useState(null);
   const fileInputRef = useRef(null);
 
   // Direct chat creation modal state
@@ -176,6 +180,56 @@ export default function Messages() {
       }
     };
 
+    // 6. Socket Reconnection & Recovery Handler
+    const handleConnect = () => {
+      console.log('⚡ Socket connected/reconnected. Recovering rooms...');
+      if (activeConv) {
+        if (activeConv.isGroup) {
+          emit('join_group', { groupId: activeConv._id });
+        } else {
+          emit('join_room', { conversationId: activeConv._id });
+        }
+      }
+    };
+
+    // 7. Attachment Events
+    const handleReceiveAttachment = ({ attachment, conversationId, groupId }) => {
+      console.log('📎 Attachment event received:', attachment);
+      if (conversationId) fetchConversations();
+      if (groupId) fetchGroups();
+    };
+
+    const handleAttachmentDelivered = ({ attachmentId }) => {
+      setMessages(prev => prev.map(m => {
+        const matches = m.attachmentId === attachmentId || m.attachmentId?._id === attachmentId;
+        return matches ? { ...m, deliveredStatus: true } : m;
+      }));
+    };
+
+    const handleAttachmentSeen = ({ attachmentId }) => {
+      setMessages(prev => prev.map(m => {
+        const matches = m.attachmentId === attachmentId || m.attachmentId?._id === attachmentId;
+        return matches ? { ...m, seenStatus: true, seenAt: new Date() } : m;
+      }));
+    };
+
+    const handleAttachmentDownloaded = ({ attachmentId, userId: downloaderId, userName }) => {
+      console.log(`📥 Attachment ${attachmentId} was downloaded by ${userName}`);
+      if (downloaderId !== user._id) {
+        setMessages(prev => prev.map(m => {
+          const matches = m.attachmentId === attachmentId || m.attachmentId?._id === attachmentId;
+          if (matches) {
+            const currentDownloads = m.downloadedBy || [];
+            if (!currentDownloads.includes(userName)) {
+              return { ...m, downloadedBy: [...currentDownloads, userName] };
+            }
+          }
+          return m;
+        }));
+      }
+    };
+
+    on('connect', handleConnect);
     on('receive_message', handleReceiveMessage);
     on('receive_group_message', handleReceiveGroupMessage);
     on('message_delivered', handleMessageDelivered);
@@ -184,8 +238,13 @@ export default function Messages() {
     on('group_created', handleGroupCreated);
     on('group_updated', handleGroupUpdated);
     on('group_deleted', handleGroupDeleted);
+    on('receive_attachment', handleReceiveAttachment);
+    on('attachment_delivered', handleAttachmentDelivered);
+    on('attachment_seen', handleAttachmentSeen);
+    on('attachment_downloaded', handleAttachmentDownloaded);
 
     return () => {
+      off('connect', handleConnect);
       off('receive_message', handleReceiveMessage);
       off('receive_group_message', handleReceiveGroupMessage);
       off('message_delivered', handleMessageDelivered);
@@ -194,6 +253,10 @@ export default function Messages() {
       off('group_created', handleGroupCreated);
       off('group_updated', handleGroupUpdated);
       off('group_deleted', handleGroupDeleted);
+      off('receive_attachment', handleReceiveAttachment);
+      off('attachment_delivered', handleAttachmentDelivered);
+      off('attachment_seen', handleAttachmentSeen);
+      off('attachment_downloaded', handleAttachmentDownloaded);
     };
   }, [activeConv]);
 
@@ -387,6 +450,14 @@ export default function Messages() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate extension
+    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    const allowedExts = ['.pdf', '.xml', '.jpg', '.jpeg', '.png', '.mp3', '.wav', '.docx', '.xlsx'];
+    if (!allowedExts.includes(ext)) {
+      alert('Unsupported file extension. Only PDF, XML, JPG, JPEG, PNG, MP3, WAV, DOCX, XLSX are allowed.');
+      return;
+    }
+
     // Validate size (10MB limit)
     if (file.size > 10 * 1024 * 1024) {
       alert('File size exceeds the 10MB limit.');
@@ -394,20 +465,39 @@ export default function Messages() {
     }
 
     setUploadingAttachment(true);
+    setUploadProgress(0);
+    setUploadingFileName(file.name);
+
     const formData = new FormData();
     formData.append('file', file);
+    if (activeConv.isGroup) {
+      formData.append('groupId', activeConv._id);
+      formData.append('isGroup', 'true');
+    } else {
+      formData.append('conversationId', activeConv._id);
+      formData.append('isGroup', 'false');
+    }
 
     try {
-      const { data } = await api.post('/messages/attachment', formData);
-      setAttachment({
-        url: data.url,
-        filename: data.filename,
-        type: data.type
+      await api.post('/attachments/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(percentCompleted);
+          }
+        },
       });
     } catch (err) {
       alert(err.response?.data?.message || 'Attachment upload failed.');
     } finally {
       setUploadingAttachment(false);
+      setUploadProgress(null);
+      setUploadingFileName('');
+      // Clear input so selecting the same file triggers change again
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -450,7 +540,7 @@ export default function Messages() {
     const isOnline = onlineUsers.has(other._id);
     return {
       name: other.fullName || 'Teuly Colleague',
-      image: other.profilePhoto,
+      image: getFullUrl(other.profilePhoto),
       isOnline,
       role: other.designation || 'Team Member',
       lastSeen: other.lastSeen
@@ -484,6 +574,210 @@ export default function Messages() {
     if (!lastSeenTime) return 'Offline';
     const date = new Date(lastSeenTime);
     return `Last seen ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} on ${date.toLocaleDateString([], { day: 'numeric', month: 'short' })}`;
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const handleDownloadAttachment = async (attachmentId, originalFileName) => {
+    try {
+      const response = await api.get(`/attachments/download/${attachmentId}`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', originalFileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      // Emit socket notification to room
+      emit('attachment_downloaded', { attachmentId });
+    } catch (err) {
+      alert(err.response?.data?.message || 'Download failed or unauthorized.');
+    }
+  };
+
+  const handlePreviewPDF = async (attachmentId, originalFileName) => {
+    try {
+      const response = await api.get(`/attachments/download/${attachmentId}`, {
+        responseType: 'blob',
+      });
+      const file = new Blob([response.data], { type: 'application/pdf' });
+      const fileURL = URL.createObjectURL(file);
+      window.open(fileURL, '_blank');
+    } catch (err) {
+      alert('Unable to preview PDF.');
+    }
+  };
+
+  const renderAttachmentCard = (msg, isMe) => {
+    const attachmentId = msg.attachmentId?._id || msg.attachmentId || msg.attachmentUrl?.split('/').pop();
+    const fileName = msg.attachmentName || msg.attachmentId?.originalFileName || 'Attachment';
+    const fileSize = msg.attachmentId?.fileSize || 0;
+    const fileType = msg.type || msg.messageType || msg.attachmentId?.fileType || 'document';
+    const downloadUrl = getFullUrl(`/api/attachments/download/${attachmentId}`);
+
+    if (!attachmentId) return null;
+
+    const formattedSize = formatFileSize(fileSize);
+
+    switch (fileType) {
+      case 'image':
+        return (
+          <div className="group relative rounded-xl overflow-hidden cursor-pointer border border-navy/10 hover:border-gold transition-all duration-300 max-w-xs shadow-md bg-navy bg-opacity-5">
+            <img
+              src={downloadUrl}
+              alt={fileName}
+              className="max-h-60 object-cover w-full hover:scale-[1.02] transition-transform duration-300"
+              onClick={() => setActivePreviewImage(downloadUrl)}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+              <p className="text-white text-xs font-bold truncate">{fileName}</p>
+              <div className="flex justify-between items-center mt-1">
+                <span className="text-[10px] text-white/70 font-semibold">{formattedSize}</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownloadAttachment(attachmentId, fileName);
+                  }}
+                  className="p-1 bg-gold text-navy rounded hover:bg-white transition-colors"
+                  title="Download"
+                >
+                  <Download size={12} />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'pdf':
+        return (
+          <div className={`p-3 rounded-xl border flex flex-col gap-2 max-w-xs transition-all duration-300 ${
+            isMe
+              ? 'bg-navy bg-opacity-30 border-white/10 text-white'
+              : 'bg-white border-navy/10 text-navy'
+          }`}>
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-lg bg-red-100 text-red-700 flex items-center justify-center flex-shrink-0">
+                <FileText size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold truncate" title={fileName}>{fileName}</p>
+                <p className="text-[10px] font-semibold opacity-60">{formattedSize}</p>
+              </div>
+            </div>
+            <div className="flex gap-2 border-t border-navy/5 pt-2 mt-1">
+              <button
+                type="button"
+                onClick={() => handlePreviewPDF(attachmentId, fileName)}
+                className={`flex-1 flex items-center justify-center gap-1 py-1 rounded text-[10px] font-bold transition-colors ${
+                  isMe
+                    ? 'bg-white/10 hover:bg-white/20 text-white'
+                    : 'bg-cream hover:bg-gold/20 text-navy'
+                }`}
+              >
+                <Eye size={12} /> Preview
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadAttachment(attachmentId, fileName)}
+                className="flex-1 flex items-center justify-center gap-1 py-1 rounded text-[10px] font-bold bg-gold text-navy hover:bg-opacity-90 transition-colors"
+              >
+                <Download size={12} /> Download
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'audio':
+        return (
+          <div className={`p-3 rounded-xl border flex flex-col gap-2 max-w-xs w-72 transition-all duration-300 ${
+            isMe
+              ? 'bg-navy bg-opacity-30 border-white/10 text-white'
+              : 'bg-white border-navy/10 text-navy'
+          }`}>
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-lg bg-gold/20 text-gold flex items-center justify-center flex-shrink-0">
+                <Music size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold truncate" title={fileName}>{fileName}</p>
+                <p className="text-[10px] font-semibold opacity-60">{formattedSize}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDownloadAttachment(attachmentId, fileName)}
+                className="p-1.5 bg-gold text-navy rounded hover:bg-opacity-95 transition-colors"
+                title="Download"
+              >
+                <Download size={12} />
+              </button>
+            </div>
+            <audio controls className="w-full h-8 mt-1 rounded bg-cream/10" src={downloadUrl}>
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        );
+
+      case 'xml':
+        return (
+          <div className={`p-3 rounded-xl border flex items-center gap-2.5 max-w-xs transition-all duration-300 ${
+            isMe
+              ? 'bg-navy bg-opacity-30 border-white/10 text-white'
+              : 'bg-white border-navy/10 text-navy'
+          }`}>
+            <div className="w-9 h-9 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center flex-shrink-0">
+              <FileCode size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold truncate" title={fileName}>{fileName}</p>
+              <p className="text-[10px] font-semibold opacity-60">{formattedSize} · XML Data</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleDownloadAttachment(attachmentId, fileName)}
+              className="p-1.5 bg-gold text-navy rounded hover:bg-opacity-95 transition-colors"
+              title="Download File"
+            >
+              <Download size={14} />
+            </button>
+          </div>
+        );
+
+      default: // Document (Word, Excel, or fallback)
+        return (
+          <div className={`p-3 rounded-xl border flex items-center gap-2.5 max-w-xs transition-all duration-300 ${
+            isMe
+              ? 'bg-navy bg-opacity-30 border-white/10 text-white'
+              : 'bg-white border-navy/10 text-navy'
+          }`}>
+            <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0">
+              <File size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold truncate" title={fileName}>{fileName}</p>
+              <p className="text-[10px] font-semibold opacity-60">{formattedSize} · Document</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleDownloadAttachment(attachmentId, fileName)}
+              className="p-1.5 bg-gold text-navy rounded hover:bg-opacity-95 transition-colors"
+              title="Download File"
+            >
+              <Download size={14} />
+            </button>
+          </div>
+        );
+    }
   };
 
   return (
@@ -528,7 +822,7 @@ export default function Messages() {
               </div>
 
               {/* Quick Actions */}
-              {activeTab === 'direct' ? (
+              <div className="flex gap-1.5">
                 <button
                   onClick={() => setShowDirectModal(true)}
                   className="p-1.5 hover:bg-cream text-navy hover:text-gold rounded-lg transition-colors border border-navy border-opacity-10"
@@ -536,8 +830,7 @@ export default function Messages() {
                 >
                   <UserPlus size={15} />
                 </button>
-              ) : (
-                user.role === 'hr' && (
+                {user.role === 'hr' && (
                   <button
                     onClick={() => setShowGroupModal(true)}
                     className="p-1.5 hover:bg-cream text-navy hover:text-gold rounded-lg transition-colors border border-navy border-opacity-10"
@@ -545,8 +838,8 @@ export default function Messages() {
                   >
                     <PlusCircle size={15} />
                   </button>
-                )
-              )}
+                )}
+              </div>
             </div>
 
             {/* Chats Listing */}
@@ -558,8 +851,14 @@ export default function Messages() {
               ) : activeTab === 'direct' ? (
                 // Direct conversations
                 conversations.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-navy text-opacity-35 italic">
-                    No active direct chats. Click the icon above to initiate a conversation.
+                  <div className="p-8 text-center text-xs text-navy text-opacity-35 italic flex flex-col items-center gap-3">
+                    <span>No active direct chats.</span>
+                    <button
+                      onClick={() => setShowDirectModal(true)}
+                      className="px-3 py-1.5 text-xs font-semibold bg-navy text-gold rounded-lg hover:bg-opacity-95 transition-all shadow-sm flex items-center gap-1.5"
+                    >
+                      <UserPlus size={13} /> Start Direct Chat
+                    </button>
                   </div>
                 ) : (
                   conversations.map(conv => {
@@ -619,8 +918,18 @@ export default function Messages() {
               ) : (
                 // Group channels listing
                 groups.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-navy text-opacity-35 italic">
-                    No active channels. {user.role === 'hr' ? 'Click + to create a group.' : 'Contact HR to join a channel.'}
+                  <div className="p-8 text-center text-xs text-navy text-opacity-35 italic flex flex-col items-center gap-3">
+                    <span>No active channels.</span>
+                    {user.role === 'hr' ? (
+                      <button
+                        onClick={() => setShowGroupModal(true)}
+                        className="px-3 py-1.5 text-xs font-semibold bg-navy text-gold rounded-lg hover:bg-opacity-95 transition-all shadow-sm flex items-center gap-1.5"
+                      >
+                        <PlusCircle size={13} /> Create Group Channel
+                      </button>
+                    ) : (
+                      <span>Contact HR to join a channel.</span>
+                    )}
                   </div>
                 ) : (
                   groups.map(group => {
@@ -789,7 +1098,7 @@ export default function Messages() {
 
                       const isMe = (msg.sender?._id || msg.senderId?._id || msg.sender || msg.senderId) === user._id;
                       const senderName = msg.sender?.fullName || msg.senderId?.fullName || 'Colleague';
-                      const senderPhoto = msg.sender?.profilePhoto || msg.senderId?.profilePhoto;
+                      const senderPhoto = getFullUrl(msg.sender?.profilePhoto || msg.senderId?.profilePhoto);
                       const msgType = msg.type || msg.messageType || 'text';
 
                       acc.push(
@@ -821,35 +1130,14 @@ export default function Messages() {
                                   : 'bg-white text-navy border border-navy border-opacity-5 rounded-tl-none'
                               }`}>
                                 {/* Media Content rendering */}
-                                {msgType === 'image' && (
-                                  <div className="mb-1 rounded-lg overflow-hidden cursor-pointer" onClick={() => window.open(msg.attachmentUrl, '_blank')}>
-                                    <img src={msg.attachmentUrl} alt={msg.attachmentName || 'image attachment'} className="max-w-xs max-h-64 object-cover" />
-                                  </div>
-                                )}
-                                
-                                {msgType === 'pdf' && (
-                                  <div className="mb-2">
-                                    <a
-                                      href={msg.attachmentUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className={`flex items-center gap-2 border px-3 py-2 rounded-xl transition-all ${
-                                        isMe
-                                          ? 'bg-navy-mid border-white border-opacity-10 text-white hover:text-gold'
-                                          : 'bg-cream border-navy border-opacity-5 text-navy hover:text-gold'
-                                      }`}
-                                    >
-                                      <FileText size={18} className="text-gold flex-shrink-0" />
-                                      <span className="truncate max-w-[150px] text-xs font-semibold">{msg.attachmentName || 'Document.pdf'}</span>
-                                      <ChevronRight size={14} className="opacity-50" />
-                                    </a>
-                                  </div>
-                                )}
+                                {renderAttachmentCard(msg, isMe)}
 
                                 {/* Highlight search keyword if query active */}
-                                <p className="whitespace-pre-wrap font-body text-xs sm:text-sm">
-                                  {highlightText(msg.content || msg.message || '', searchQuery)}
-                                </p>
+                                {msgType === 'text' && (
+                                  <p className="whitespace-pre-wrap font-body text-xs sm:text-sm">
+                                    {highlightText(msg.content || msg.message || '', searchQuery)}
+                                  </p>
+                                )}
                               </div>
 
                               {/* Message timestamp and status indicators */}
@@ -894,20 +1182,22 @@ export default function Messages() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Attachment Upload Preview Bar */}
-                {attachment && (
-                  <div className="px-4 py-2 border-t border-navy border-opacity-5 bg-white flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-navy bg-cream px-3 py-1.5 rounded-xl border border-navy border-opacity-5">
-                      <FileText size={14} className="text-gold" />
-                      <span className="truncate max-w-[200px]">{attachment.filename}</span>
-                      <span className="text-[10px] text-navy text-opacity-40 uppercase">({attachment.type})</span>
+                {/* Upload Progress Bar */}
+                {uploadingAttachment && (
+                  <div className="px-4 py-3 border-t border-navy border-opacity-5 bg-white flex flex-col gap-2">
+                    <div className="flex justify-between items-center text-xs font-semibold text-navy">
+                      <span className="flex items-center gap-1.5 truncate max-w-[250px]">
+                        <Loader2 size={13} className="animate-spin text-gold" />
+                        Uploading: <span className="text-gold font-bold truncate">{uploadingFileName}</span>
+                      </span>
+                      <span className="text-navy text-opacity-65">{uploadProgress ?? 0}%</span>
                     </div>
-                    <button
-                      onClick={() => setAttachment(null)}
-                      className="p-1 hover:bg-red-50 text-red-500 rounded-lg transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
+                    <div className="w-full bg-cream rounded-full h-2 overflow-hidden border border-navy border-opacity-5">
+                      <div
+                        className="bg-gold h-full transition-all duration-300 rounded-full"
+                        style={{ width: `${uploadProgress ?? 0}%` }}
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -921,14 +1211,14 @@ export default function Messages() {
                     ref={fileInputRef}
                     onChange={handleFileChange}
                     className="hidden"
-                    accept="image/*,application/pdf"
+                    accept="image/*,application/pdf,application/xml,text/xml,audio/*,.docx,.xlsx"
                   />
                   <button
                     type="button"
                     disabled={uploadingAttachment}
                     onClick={() => fileInputRef.current?.click()}
                     className="p-2.5 bg-cream hover:bg-navy hover:text-gold text-navy text-opacity-60 rounded-xl transition-all border border-navy border-opacity-5"
-                    title="Upload File (Image/PDF)"
+                    title="Upload File (PDF, XML, Images, Audio, Word, Excel)"
                   >
                     {uploadingAttachment ? (
                       <Loader2 size={16} className="animate-spin text-gold" />
@@ -1002,7 +1292,7 @@ export default function Messages() {
                       >
                         <div className="relative">
                           {u.profilePhoto ? (
-                            <img src={u.profilePhoto} alt={u.fullName} className="w-8 h-8 rounded-full object-cover border border-navy border-opacity-5" />
+                            <img src={getFullUrl(u.profilePhoto)} alt={u.fullName} className="w-8 h-8 rounded-full object-cover border border-navy border-opacity-5" />
                           ) : (
                             <div className="w-8 h-8 rounded-full bg-navy text-gold font-bold text-xs flex items-center justify-center">
                               {u.fullName.split(' ').filter(Boolean).slice(0,2).map(n=>n[0]).join('').toUpperCase()}
@@ -1210,6 +1500,41 @@ export default function Messages() {
                     </button>
                   </div>
                 </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Fullscreen Image Preview Modal */}
+        <AnimatePresence>
+          {activePreviewImage && (
+            <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.8 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setActivePreviewImage(null)}
+                className="fixed inset-0 bg-navy/90 backdrop-blur-md"
+              />
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="relative z-50 max-w-4xl max-h-[85vh] overflow-hidden flex items-center justify-center rounded-2xl shadow-2xl bg-black"
+              >
+                <img
+                  src={activePreviewImage}
+                  alt="Attachment Preview"
+                  className="max-w-full max-h-[85vh] object-contain rounded-2xl"
+                />
+                <button
+                  type="button"
+                  onClick={() => setActivePreviewImage(null)}
+                  className="absolute top-4 right-4 p-2 bg-navy/80 hover:bg-gold text-white hover:text-navy rounded-full transition-all shadow-md"
+                  title="Close Preview"
+                >
+                  <X size={18} />
+                </button>
               </motion.div>
             </div>
           )}

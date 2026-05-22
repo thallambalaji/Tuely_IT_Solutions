@@ -9,7 +9,7 @@ import {
 import { Sidebar } from '../../components/common/Sidebar';
 import { Header } from '../../components/common/Header';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../utils/api';
+import api, { getFullUrl } from '../../utils/api';
 
 const EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship'];
 const STATES_LIST = ['Andhra Pradesh', 'Karnataka', 'Tamil Nadu', 'Telangana', 'Maharashtra', 'Delhi', 'Kerala'];
@@ -457,7 +457,7 @@ export default function EmployeeProfile() {
               <div className="flex items-center gap-4 pb-4 border-b border-navy border-opacity-5">
                 <div className="relative w-16 h-16 rounded-full bg-cream border border-navy border-opacity-15 flex items-center justify-center overflow-hidden group">
                   {profilePhoto ? (
-                    <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+                    <img src={getFullUrl(profilePhoto)} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     <User size={24} className="text-navy text-opacity-35" />
                   )}
@@ -539,7 +539,7 @@ export default function EmployeeProfile() {
                     </label>
                     {resumeUrl ? (
                       <a
-                        href={resumeUrl}
+                        href={getFullUrl(resumeUrl)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-gold font-semibold hover:underline flex items-center gap-1"

@@ -4,9 +4,10 @@ const groupMessageSchema = new mongoose.Schema({
   groupId:        { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true },
   senderId:       { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   message:        { type: String, trim: true, default: '' },
-  messageType:    { type: String, enum: ['text', 'image', 'pdf'], default: 'text' },
+  messageType:    { type: String, enum: ['text', 'image', 'pdf', 'audio', 'xml', 'document'], default: 'text' },
   attachmentUrl:  { type: String, default: '' },
   attachmentName: { type: String, default: '' },
+  attachmentId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Attachment' },
   seenBy:         [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   deliveredTo:    [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 

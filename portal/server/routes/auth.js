@@ -67,6 +67,7 @@ router.post('/login', async (req, res) => {
         department: user.department,
         profilePhoto: user.profilePhoto,
       },
+      token
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -93,7 +94,7 @@ router.post('/logout', authenticate, async (req, res) => {
 
 // GET /api/auth/me — verify session and return current user
 router.get('/me', authenticate, async (req, res) => {
-  return res.status(200).json({ user: req.user });
+  return res.status(200).json({ user: req.user, token: req.token });
 });
 
 module.exports = router;

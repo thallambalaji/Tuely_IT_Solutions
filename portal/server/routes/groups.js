@@ -109,13 +109,14 @@ router.get('/:id/messages', authenticate, async (req, res) => {
     const group = await Group.findById(req.params.id);
     if (!group || group.deletedAt) return res.status(404).json({ message: 'Group not found.' });
 
-    if (req.user.role !== 'hr' && !group.members.includes(req.user._id)) {
+    if (req.user.role !== 'hr' && !group.members.some(m => m.equals(req.user._id))) {
       return res.status(403).json({ message: 'Access denied.' });
     }
 
     const { page = 1, limit = 30 } = req.query;
     const messages = await GroupMessage.find({ groupId: req.params.id })
       .populate('senderId', 'fullName firstName lastName profilePhoto')
+      .populate('attachmentId')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit));

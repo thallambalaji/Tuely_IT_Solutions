@@ -7,7 +7,7 @@ import {
   Download, Filter
 } from 'lucide-react';
 import { Sidebar } from '../../components/common/Sidebar';
-import api from '../../utils/api';
+import api, { getFullUrl } from '../../utils/api';
 
 const CATEGORY_COLORS = {
   Development: 'bg-blue-100 text-blue-700',
@@ -219,7 +219,7 @@ export default function HRWorkLogs() {
                     className={`w-full text-left p-4 hover:bg-gold/5 transition-colors ${activeLog?._id === log._id ? 'bg-gold/10 border-l-4 border-gold' : ''}`}>
                     <div className="flex items-start gap-3">
                       {log.employee?.profilePhoto
-                        ? <img src={log.employee.profilePhoto} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                        ? <img src={getFullUrl(log.employee.profilePhoto)} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
                         : <InitialsAvatar name={log.employee?.fullName} size={36} />
                       }
                       <div className="min-w-0 flex-1">
@@ -251,7 +251,7 @@ export default function HRWorkLogs() {
                 <div className="p-6 border-b border-navy/10 flex items-center justify-between bg-navy/[0.02]">
                   <div className="flex items-center gap-3">
                     {activeLog.employee?.profilePhoto
-                      ? <img src={activeLog.employee.profilePhoto} className="w-12 h-12 rounded-full object-cover" />
+                      ? <img src={getFullUrl(activeLog.employee.profilePhoto)} className="w-12 h-12 rounded-full object-cover" />
                       : <InitialsAvatar name={activeLog.employee?.fullName} size={48} />
                     }
                     <div>

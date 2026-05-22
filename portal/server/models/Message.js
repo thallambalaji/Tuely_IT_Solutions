@@ -4,9 +4,10 @@ const messageSchema = new mongoose.Schema({
   conversationId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Conversation', required: true },
   sender:           { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   content:          { type: String, trim: true, default: '' },
-  type:             { type: String, enum: ['text', 'image', 'pdf'], default: 'text' },
+  type:             { type: String, enum: ['text', 'image', 'pdf', 'audio', 'xml', 'document'], default: 'text' },
   attachmentUrl:    { type: String, default: '' },   // path for image/pdf
   attachmentName:   { type: String, default: '' },   // original filename
+  attachmentId:     { type: mongoose.Schema.Types.ObjectId, ref: 'Attachment' },
 
   // ── Delivery/Seen tick system ──────────────────────────────────
   deliveredStatus:  { type: Boolean, default: false }, // delivered to recipient device (✓✓ gray)

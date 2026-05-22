@@ -80,15 +80,31 @@ async function generateEmployeeId() {
   return `TIS_${String(maxNum + 1).padStart(3, '0')}`;
 }
 
-// ── GET /api/users — HR: all employees | Employee: self only ──────
+// ── GET /api/users — HR: all employees | Employee: all active users (sanitized for directory) ──────
 router.get('/', authenticate, async (req, res) => {
   try {
     if (req.user.role === 'hr') {
       const users = await User.find({ isActive: true }).sort({ createdAt: -1 });
       return res.json(users); // HR gets full data including salary
     }
-    const user = await User.findById(req.user._id);
-    return res.json([sanitizeForEmployee(user)]);
+    const users = await User.find({ isActive: true }).sort({ fullName: 1 });
+    // Strip sensitive fields before sending to other employees
+    const sanitized = users.map(u => {
+      const uObj = u.toObject ? u.toObject() : { ...u };
+      return {
+        _id: uObj._id,
+        fullName: uObj.fullName,
+        firstName: uObj.firstName,
+        lastName: uObj.lastName,
+        profilePhoto: uObj.profilePhoto,
+        role: uObj.role,
+        designation: uObj.designation,
+        department: uObj.department,
+        isActive: uObj.isActive,
+        lastSeen: uObj.lastSeen
+      };
+    });
+    return res.json(sanitized);
   } catch (err) {
     return res.status(500).json({ message: 'Failed to fetch users.' });
   }

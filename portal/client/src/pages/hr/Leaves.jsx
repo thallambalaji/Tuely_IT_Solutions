@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Sidebar } from '../../components/common/Sidebar';
 import { Header } from '../../components/common/Header';
-import api from '../../utils/api';
+import api, { getFullUrl } from '../../utils/api';
 
 export default function HRLeaves() {
   const [requests, setRequests] = useState([]);
@@ -108,7 +108,7 @@ export default function HRLeaves() {
                         {/* Employee info */}
                         <td className="p-4 flex items-center gap-3">
                           {emp.profilePhoto ? (
-                            <img src={emp.profilePhoto} alt={emp.fullName} className="w-9 h-9 rounded-full object-cover" />
+                            <img src={getFullUrl(emp.profilePhoto)} alt={emp.fullName} className="w-9 h-9 rounded-full object-cover" />
                           ) : (
                             <div className="w-9 h-9 rounded-full bg-navy text-gold font-bold text-xs flex items-center justify-center">
                               {emp.fullName?.[0] || 'E'}

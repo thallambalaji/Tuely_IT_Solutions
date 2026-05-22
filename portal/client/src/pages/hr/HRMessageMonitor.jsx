@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { Search, Loader2, MessageSquare, Eye, Clock, Users, ShieldCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Loader2, MessageSquare, Eye, Clock, Users, ShieldCheck, Download, Play, Pause, Music, File, FileCode, FileText, X } from 'lucide-react';
 import { Sidebar } from '../../components/common/Sidebar';
 import { useSocket } from '../../context/SocketContext';
-import api from '../../utils/api';
+import api, { API_BASE_URL, getFullUrl } from '../../utils/api';
+
 
 function InitialsAvatar({ name, size = 36 }) {
   const initials = name ? name.split(' ').filter(Boolean).slice(0, 2).map(n => n[0].toUpperCase()).join('') : '?';
@@ -23,6 +24,7 @@ export default function HRMessageMonitor() {
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activePreviewImage, setActivePreviewImage] = useState(null);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -77,6 +79,173 @@ export default function HRMessageMonitor() {
   const getConvTitle = (conv) => {
     if (conv.type === 'group') return conv.groupName || 'Group Chat';
     return conv.participants?.map(p => p.fullName).join(' ↔ ') || 'Direct Chat';
+  };
+
+  const handleDownloadAttachment = async (attachmentId, originalFileName) => {
+    try {
+      const response = await api.get(`/attachments/download/${attachmentId}`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', originalFileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Download failed.');
+    }
+  };
+
+  const handlePreviewPDF = async (attachmentId, originalFileName) => {
+    try {
+      const response = await api.get(`/attachments/download/${attachmentId}`, {
+        responseType: 'blob',
+      });
+      const file = new Blob([response.data], { type: 'application/pdf' });
+      const fileURL = URL.createObjectURL(file);
+      window.open(fileURL, '_blank');
+    } catch (err) {
+      alert('Unable to preview PDF.');
+    }
+  };
+
+  const renderAttachmentCard = (msg) => {
+    const attachmentId = msg.attachmentId?._id || msg.attachmentId || msg.attachmentUrl?.split('/').pop();
+    const fileName = msg.attachmentName || msg.attachmentId?.originalFileName || 'Attachment';
+    const fileType = msg.type || msg.messageType || msg.attachmentId?.fileType || 'document';
+    const downloadUrl = getFullUrl(`/api/attachments/download/${attachmentId}`);
+
+    if (!attachmentId) return null;
+
+    switch (fileType) {
+      case 'image':
+        return (
+          <div className="group relative rounded-xl overflow-hidden cursor-pointer border border-navy/10 hover:border-gold transition-all duration-300 max-w-xs shadow-md bg-navy bg-opacity-5">
+            <img
+              src={downloadUrl}
+              alt={fileName}
+              className="max-h-48 object-cover w-full hover:scale-[1.02] transition-transform duration-300"
+              onClick={() => setActivePreviewImage(downloadUrl)}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-2.5">
+              <p className="text-white text-xs font-bold truncate">{fileName}</p>
+              <div className="flex justify-end mt-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownloadAttachment(attachmentId, fileName);
+                  }}
+                  className="p-1 bg-gold text-navy rounded hover:bg-white transition-colors"
+                  title="Download"
+                >
+                  <Download size={12} />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'pdf':
+        return (
+          <div className="p-3 rounded-xl border border-navy/10 bg-white text-navy flex flex-col gap-2 max-w-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-red-100 text-red-700 flex items-center justify-center flex-shrink-0">
+                <FileText size={16} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold truncate" title={fileName}>{fileName}</p>
+              </div>
+            </div>
+            <div className="flex gap-2 border-t border-navy/5 pt-2 mt-1">
+              <button
+                type="button"
+                onClick={() => handlePreviewPDF(attachmentId, fileName)}
+                className="flex-1 flex items-center justify-center gap-1 py-1 rounded text-[10px] font-bold bg-cream hover:bg-gold/20 text-navy transition-colors"
+              >
+                <Eye size={12} /> Preview
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadAttachment(attachmentId, fileName)}
+                className="flex-1 flex items-center justify-center gap-1 py-1 rounded text-[10px] font-bold bg-gold text-navy hover:bg-opacity-90 transition-colors"
+              >
+                <Download size={12} /> Download
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'audio':
+        return (
+          <div className="p-3 rounded-xl border border-navy/10 bg-white text-navy flex flex-col gap-2 max-w-xs w-72">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gold/20 text-gold flex items-center justify-center flex-shrink-0">
+                <Music size={16} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold truncate" title={fileName}>{fileName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDownloadAttachment(attachmentId, fileName)}
+                className="p-1 bg-gold text-navy rounded hover:bg-opacity-95 transition-colors"
+                title="Download"
+              >
+                <Download size={12} />
+              </button>
+            </div>
+            <audio controls className="w-full h-8 mt-1 rounded bg-cream/10" src={downloadUrl}>
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        );
+
+      case 'xml':
+        return (
+          <div className="p-3 rounded-xl border border-navy/10 bg-white text-navy flex items-center gap-2.5 max-w-xs">
+            <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center flex-shrink-0">
+              <FileCode size={16} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold truncate" title={fileName}>{fileName}</p>
+              <p className="text-[10px] font-semibold opacity-60">XML Data</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleDownloadAttachment(attachmentId, fileName)}
+              className="p-1 bg-gold text-navy rounded hover:bg-opacity-95 transition-colors"
+              title="Download File"
+            >
+              <Download size={12} />
+            </button>
+          </div>
+        );
+
+      default: // Document (Word, Excel, or fallback)
+        return (
+          <div className="p-3 rounded-xl border border-navy/10 bg-white text-navy flex items-center gap-2.5 max-w-xs">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0">
+              <File size={16} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold truncate" title={fileName}>{fileName}</p>
+              <p className="text-[10px] font-semibold opacity-60">Document</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleDownloadAttachment(attachmentId, fileName)}
+              className="p-1 bg-gold text-navy rounded hover:bg-opacity-95 transition-colors"
+              title="Download File"
+            >
+              <Download size={12} />
+            </button>
+          </div>
+        );
+    }
   };
 
   return (
@@ -183,7 +352,7 @@ export default function HRMessageMonitor() {
                       {messages.map(msg => (
                         <div key={msg._id} className="flex gap-3 items-start">
                           {msg.sender?.profilePhoto
-                            ? <img src={msg.sender.profilePhoto} className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-1" />
+                            ? <img src={getFullUrl(msg.sender.profilePhoto)} className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-1" />
                             : <InitialsAvatar name={msg.sender?.fullName} size={32} />
                           }
                           <div className="flex-1 max-w-xl">
@@ -198,13 +367,7 @@ export default function HRMessageMonitor() {
                             </div>
                             <div className="bg-cream rounded-2xl rounded-tl-none px-4 py-2.5 text-sm text-navy">
                               {msg.type === 'text' && msg.content}
-                              {msg.type === 'image' && <img src={msg.attachmentUrl} className="max-w-xs rounded-xl" alt="attachment" />}
-                              {msg.type === 'pdf' && (
-                                <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer"
-                                  className="flex items-center gap-2 text-navy font-semibold hover:text-gold transition-colors">
-                                  📄 {msg.attachmentName || 'Document.pdf'}
-                                </a>
-                              )}
+                              {msg.type !== 'text' && renderAttachmentCard(msg)}
                             </div>
                           </div>
                         </div>
@@ -225,6 +388,41 @@ export default function HRMessageMonitor() {
             )}
           </div>
         </div>
+
+        {/* Fullscreen Image Preview Modal */}
+        <AnimatePresence>
+          {activePreviewImage && (
+            <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.8 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setActivePreviewImage(null)}
+                className="fixed inset-0 bg-navy/90 backdrop-blur-md"
+              />
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="relative z-50 max-w-4xl max-h-[85vh] overflow-hidden flex items-center justify-center rounded-2xl shadow-2xl bg-black"
+              >
+                <img
+                  src={activePreviewImage}
+                  alt="Attachment Preview"
+                  className="max-w-full max-h-[85vh] object-contain rounded-2xl"
+                />
+                <button
+                  type="button"
+                  onClick={() => setActivePreviewImage(null)}
+                  className="absolute top-4 right-4 p-2 bg-navy/80 hover:bg-gold text-white hover:text-navy rounded-full transition-all shadow-md"
+                  title="Close Preview"
+                >
+                  <X size={18} />
+                </button>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
       </main>
     </div>

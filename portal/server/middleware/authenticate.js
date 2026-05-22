@@ -8,7 +8,20 @@ const User = require('../models/User');
  */
 const authenticate = async (req, res, next) => {
   try {
-    const token = req.cookies?.token;
+    let token = req.cookies?.token;
+
+    // Check Authorization Header
+    if (!token && req.headers.authorization) {
+      const parts = req.headers.authorization.split(' ');
+      if (parts.length === 2 && parts[0] === 'Bearer') {
+        token = parts[1];
+      }
+    }
+
+    // Check query parameters (for file downloads and media tags)
+    if (!token && req.query.token) {
+      token = req.query.token;
+    }
 
     if (!token) {
       return res.status(401).json({ message: 'Authentication required. Please log in.' });
@@ -26,6 +39,7 @@ const authenticate = async (req, res, next) => {
     }
 
     req.user = user;
+    req.token = token; // Attach token for downstream use
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {

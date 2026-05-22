@@ -5,6 +5,8 @@ import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
+import { getFullUrl } from '../../utils/api';
+
 export const Header = ({ title }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -141,7 +143,7 @@ export const Header = ({ title }) => {
         <div className="flex items-center gap-2 border-l border-navy border-opacity-10 pl-4">
           <div className="w-10 h-10 rounded-full bg-navy text-gold font-bold flex items-center justify-center flex-shrink-0 text-sm overflow-hidden">
             {user?.profilePhoto ? (
-              <img src={user.profilePhoto} alt={user.fullName} className="w-full h-full object-cover" />
+              <img src={getFullUrl(user.profilePhoto)} alt={user.fullName} className="w-full h-full object-cover" />
             ) : (
               user?.fullName?.[0] || '?'
             )}

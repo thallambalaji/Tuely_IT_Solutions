@@ -22,10 +22,13 @@ const notificationRoutes = require('./routes/notifications');
 const fileRoutes         = require('./routes/files');
 const socketHandler      = require('./socket/socketHandler');
 const { startWeeklyReporterCron } = require('./utils/emailReporter');
+const attachmentRoutes   = require('./routes/attachments');
+const { startAttachmentCleanup } = require('./utils/attachmentCleanup');
 
 // ── Model imports (for index creation) ─────────────────────────
 const User         = require('./models/User');
 const Message      = require('./models/Message');
+const Attachment   = require('./models/Attachment');
 const GroupMessage = require('./models/GroupMessage');
 const WorkLog      = require('./models/WorkLog');
 const Task         = require('./models/Task');
@@ -44,10 +47,18 @@ const uploadsBase = path.join(__dirname, 'uploads');
   if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
 });
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://tuely.netlify.app'
+];
+if (process.env.CLIENT_URL) {
+  allowedOrigins.push(process.env.CLIENT_URL);
+}
+
 // ── Socket.IO ───────────────────────────────────────────────────
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -57,7 +68,13 @@ app.set('io', io);
 
 // ── Middleware ──────────────────────────────────────────────────
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -79,6 +96,7 @@ app.use('/api/messages',      messageRoutes);
 app.use('/api/groups',        groupRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/files',         fileRoutes); // protected file serving
+app.use('/api/attachments',   attachmentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -111,6 +129,13 @@ async function createIndexes() {
     // TTL indexes — auto-delete messages after 14 days
     await Message.collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, background: true });
     await GroupMessage.collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, background: true });
+    await Attachment.collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, background: true });
+
+    // Attachment performance indexes
+    await Attachment.collection.createIndex({ senderId: 1 }, { background: true });
+    await Attachment.collection.createIndex({ receiverId: 1 }, { background: true });
+    await Attachment.collection.createIndex({ groupId: 1 }, { background: true });
+    await Attachment.collection.createIndex({ channelId: 1 }, { background: true });
 
     // Performance indexes
     await User.collection.createIndex({ employeeId: 1 }, { unique: true, sparse: true, background: true });
@@ -141,6 +166,7 @@ const startServer = async () => {
       console.log('✅ MongoDB connected');
       await createIndexes();
       startWeeklyReporterCron();
+      startAttachmentCleanup();
     } catch (err) {
       console.error('❌ MongoDB connection failed:', err.message);
       if (process.env.NODE_ENV === 'production') process.exit(1);

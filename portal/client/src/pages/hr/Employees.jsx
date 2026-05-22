@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { Sidebar } from '../../components/common/Sidebar';
 import { useSocket } from '../../context/SocketContext';
-import api from '../../utils/api';
+import api, { getFullUrl } from '../../utils/api';
 
 const DEPARTMENTS = ['All', 'IT', 'Non-IT', 'Management', 'Operations'];
 const DESIGNATIONS = [
@@ -637,7 +637,7 @@ export default function Employees() {
                       <div className="flex items-center gap-3">
                         <div className="relative flex-shrink-0">
                           {emp.profilePhoto
-                            ? <img src={emp.profilePhoto} alt={emp.fullName} className="w-10 h-10 rounded-full object-cover border border-navy/10" />
+                            ? <img src={getFullUrl(emp.profilePhoto)} alt={emp.fullName} className="w-10 h-10 rounded-full object-cover border border-navy/10" />
                             : <InitialsAvatar name={emp.fullName} size={40} />
                           }
                           {isOnline && <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse" />}
@@ -722,7 +722,7 @@ export default function Employees() {
                 <div className="p-6 border-b border-navy/10 flex justify-between items-center">
                   <div className="flex items-center gap-3">
                     {activeTaskPanel.profilePhoto
-                      ? <img src={activeTaskPanel.profilePhoto} className="w-12 h-12 rounded-full object-cover" />
+                      ? <img src={getFullUrl(activeTaskPanel.profilePhoto)} className="w-12 h-12 rounded-full object-cover" />
                       : <InitialsAvatar name={activeTaskPanel.fullName} size={48} />
                     }
                     <div>

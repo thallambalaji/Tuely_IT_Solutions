@@ -5,7 +5,8 @@ import {
   AlertCircle, ChevronLeft, ChevronRight, FileSpreadsheet, RefreshCw
 } from 'lucide-react';
 import { Sidebar } from '../../components/common/Sidebar';
-import api from '../../utils/api';
+import api, { API_BASE_URL, getFullUrl } from '../../utils/api';
+
 
 const DEPARTMENTS = ['All', 'IT', 'Non-IT', 'Management', 'Operations'];
 const STATUSES = ['Present', 'Absent', 'Half Day', 'Leave'];
@@ -118,7 +119,7 @@ export default function HRAttendance() {
     const params = viewMode === 'daily'
       ? `date=${selectedDate}&format=${format}`
       : `month=${selectedMonth}&year=${selectedYear}&format=${format}`;
-    window.open(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/attendance/export?${params}`, '_blank');
+    window.open(`${API_BASE_URL}/api/attendance/export?${params}`, '_blank');
   };
 
   // Filtered employees list
@@ -331,7 +332,7 @@ export default function HRAttendance() {
                         {/* Name & Photo */}
                         <td className="p-4 flex items-center gap-3">
                           {emp.profilePhoto ? (
-                            <img src={emp.profilePhoto} alt={emp.fullName} className="w-9 h-9 rounded-full object-cover" />
+                            <img src={getFullUrl(emp.profilePhoto)} alt={emp.fullName} className="w-9 h-9 rounded-full object-cover" />
                           ) : (
                             <div className="w-9 h-9 rounded-full bg-navy text-gold font-bold text-xs flex items-center justify-center">
                               {emp.fullName[0]}

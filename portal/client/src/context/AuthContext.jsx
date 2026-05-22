@@ -18,12 +18,22 @@ export const AuthProvider = ({ children }) => {
   // Check existing session on mount
   useEffect(() => {
     const checkSession = async () => {
+      const storedToken = localStorage.getItem('tc_token');
+      if (!storedToken) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
       try {
         const { data } = await api.get('/auth/me');
         setUser(data.user);
-        connectSocket();
+        if (data.token) {
+          localStorage.setItem('tc_token', data.token);
+        }
+        connectSocket(data.token || storedToken);
       } catch {
         setUser(null);
+        localStorage.removeItem('tc_token');
       } finally {
         setLoading(false);
       }
@@ -34,12 +44,18 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback(async (companyEmail, password) => {
     const { data } = await api.post('/auth/login', { companyEmail, password });
     setUser(data.user);
-    connectSocket();
+    if (data.token) {
+      localStorage.setItem('tc_token', data.token);
+    }
+    connectSocket(data.token);
     return data.user;
   }, []);
 
   const logout = useCallback(async () => {
-    await api.post('/auth/logout');
+    try {
+      await api.post('/auth/logout');
+    } catch (_) {}
+    localStorage.removeItem('tc_token');
     setUser(null);
     disconnectSocket();
     window.location.href = '/portal/login';

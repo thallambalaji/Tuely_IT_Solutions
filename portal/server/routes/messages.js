@@ -34,12 +34,10 @@ const uploadAttachment = multer({
   },
 });
 
-// GET /api/messages/conversations — own conversations | HR: all
+// GET /api/messages/conversations — own conversations (all roles)
 router.get('/conversations', authenticate, async (req, res) => {
   try {
-    const query = req.user.role === 'hr'
-      ? {}
-      : { participants: req.user._id };
+    const query = { participants: req.user._id };
 
     const conversations = await Conversation.find(query)
       .populate('participants', 'fullName firstName lastName profilePhoto designation department lastSeen')
@@ -102,12 +100,13 @@ router.get('/:conversationId', authenticate, async (req, res) => {
     if (!conv) return res.status(404).json({ message: 'Conversation not found.' });
 
     // HR can read any; employees only their own
-    if (req.user.role !== 'hr' && !conv.participants.includes(req.user._id)) {
+    if (req.user.role !== 'hr' && !conv.participants.some(p => p.equals(req.user._id))) {
       return res.status(403).json({ message: 'Access denied.' });
     }
 
     const messages = await Message.find({ conversationId: req.params.conversationId, isDeleted: false })
       .populate('sender', 'fullName firstName lastName profilePhoto role')
+      .populate('attachmentId')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit));
