@@ -45,8 +45,21 @@ export const AuthProvider = ({ children }) => {
     checkSession();
   }, []);
 
-  const login = useCallback(async (companyEmail, password) => {
+  const login = useCallback(async (companyEmail, password, expectedRole) => {
     const { data } = await api.post('/auth/login', { companyEmail, password });
+    
+    if (expectedRole && data.user.role !== expectedRole) {
+      const error = new Error('Role mismatch');
+      error.response = {
+        data: {
+          message: expectedRole === 'hr'
+            ? 'Access Denied: Employee credentials cannot be used to log into the HR portal.'
+            : 'Access Denied: HR credentials cannot be used to log into the Employee portal.'
+        }
+      };
+      throw error;
+    }
+
     setUser(data.user);
     if (data.token) {
       sessionStorage.setItem('tc_token', data.token);
@@ -56,7 +69,7 @@ export const AuthProvider = ({ children }) => {
     return data.user;
   }, []);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (shouldRedirect = true) => {
     try {
       await api.post('/auth/logout');
     } catch (_) {}
@@ -64,7 +77,9 @@ export const AuthProvider = ({ children }) => {
     sessionStorage.removeItem('tc_token_expires_at');
     setUser(null);
     disconnectSocket();
-    window.location.href = '/portal/login';
+    if (shouldRedirect) {
+      window.location.href = '/portal/login';
+    }
   }, []);
 
   // Auto-logout check interval (absolute 1-hour session timeout)

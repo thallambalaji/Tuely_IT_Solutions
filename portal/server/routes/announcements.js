@@ -14,6 +14,9 @@ router.get('/', authenticate, async (req, res) => {
     if (req.user.role === 'employee') {
       // Employee sees All + their department
       audienceFilter = ['All', req.user.department];
+    } else {
+      // HR sees all announcements
+      audienceFilter = ['All', 'IT', 'Non-IT'];
     }
 
     const announcements = await Announcement.find({

@@ -34,11 +34,17 @@ export default function HRReports() {
   const fetchAnalyticsData = async () => {
     setLoading(true);
     try {
+      const getLocalDateString = (d = new Date()) => {
+        const pad = (num) => String(num).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      };
+      const todayStr = getLocalDateString();
+
       const [usersRes, tasksRes, leavesRes, attendanceRes, logsRes] = await Promise.all([
         api.get('/users'),
         api.get('/tasks'),
         api.get('/leaves'),
-        api.get(`/attendance?from=${new Date().toISOString().split('T')[0]}&to=${new Date().toISOString().split('T')[0]}`),
+        api.get(`/attendance?from=${todayStr}&to=${todayStr}`),
         api.get('/work-logs')
       ]);
 
@@ -66,7 +72,7 @@ export default function HRReports() {
       setDepartmentData(Object.entries(deptCounts).map(([name, value]) => ({ name, count: value })));
 
       // Calculate today's attendance stats
-      const attStats = { Present: 0, Absent: 0, 'Half-day': 0, Leave: 0 };
+      const attStats = { Present: 0, Absent: 0, 'Half Day': 0, Leave: 0 };
       attendanceRes.data.forEach(r => {
         if (attStats.hasOwnProperty(r.status)) {
           attStats[r.status]++;
@@ -81,7 +87,7 @@ export default function HRReports() {
       setAttendancePieData(pieData.length > 0 ? pieData : [
         { name: 'Present', value: 0 },
         { name: 'Absent', value: 0 },
-        { name: 'Half-day', value: 0 },
+        { name: 'Half Day', value: 0 },
         { name: 'Leave', value: 0 }
       ]);
 
@@ -137,7 +143,11 @@ export default function HRReports() {
         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
-      pdf.save(`HR_Performance_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+      const getLocalDateString = (d = new Date()) => {
+        const pad = (num) => String(num).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      };
+      pdf.save(`HR_Performance_Report_${getLocalDateString()}.pdf`);
     } catch (err) {
       console.error('Error generating PDF:', err);
     }

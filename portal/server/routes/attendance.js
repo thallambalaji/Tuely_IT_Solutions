@@ -10,25 +10,32 @@ const router = express.Router();
 // GET /api/attendance — HR: all for date | Employee: own monthly
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { date, month, year, employeeId } = req.query;
+    const { date, month, year, employeeId, from, to } = req.query;
     let query = {};
 
     if (req.user.role === 'employee') {
       query.employee = req.user._id;
-      if (month && year) {
-        const start = new Date(year, month - 1, 1);
-        const end = new Date(year, month, 0, 23, 59, 59, 999);
-        query.date = { $gte: start, $lte: end };
-      }
     } else {
-      // HR queries
-      if (date) {
-        const d = new Date(date);
-        const start = new Date(d.setHours(0, 0, 0, 0));
-        const end = new Date(new Date(date).setHours(23, 59, 59, 999));
-        query.date = { $gte: start, $lte: end };
+      if (employeeId && employeeId !== 'all') {
+        query.employee = employeeId;
       }
-      if (employeeId && employeeId !== 'all') query.employee = employeeId;
+    }
+
+    if (date) {
+      const d = new Date(date);
+      const start = new Date(d.setUTCHours(0, 0, 0, 0));
+      const end = new Date(new Date(date).setUTCHours(23, 59, 59, 999));
+      query.date = { $gte: start, $lte: end };
+    } else if (from && to) {
+      const start = new Date(from);
+      start.setUTCHours(0, 0, 0, 0);
+      const end = new Date(to);
+      end.setUTCHours(23, 59, 59, 999);
+      query.date = { $gte: start, $lte: end };
+    } else if (month && year) {
+      const start = new Date(Date.UTC(Number(year), Number(month) - 1, 1, 0, 0, 0, 0));
+      const end = new Date(Date.UTC(Number(year), Number(month), 0, 23, 59, 59, 999));
+      query.date = { $gte: start, $lte: end };
     }
 
     const records = await Attendance.find(query)
@@ -51,7 +58,7 @@ router.post('/', authenticate, requireHR, async (req, res) => {
     }
 
     const attendanceDate = new Date(date);
-    attendanceDate.setHours(0, 0, 0, 0);
+    attendanceDate.setUTCHours(0, 0, 0, 0);
     const results = [];
 
     for (const rec of records) {
@@ -99,12 +106,12 @@ router.get('/export', authenticate, requireHR, async (req, res) => {
 
     if (date) {
       const d = new Date(date);
-      const start = new Date(d.setHours(0, 0, 0, 0));
-      const end = new Date(new Date(date).setHours(23, 59, 59, 999));
+      const start = new Date(d.setUTCHours(0, 0, 0, 0));
+      const end = new Date(new Date(date).setUTCHours(23, 59, 59, 999));
       query.date = { $gte: start, $lte: end };
     } else if (month && year) {
-      const start = new Date(year, month - 1, 1);
-      const end = new Date(year, month, 0, 23, 59, 59, 999);
+      const start = new Date(Date.UTC(Number(year), Number(month) - 1, 1, 0, 0, 0, 0));
+      const end = new Date(Date.UTC(Number(year), Number(month), 0, 23, 59, 59, 999));
       query.date = { $gte: start, $lte: end };
     }
 

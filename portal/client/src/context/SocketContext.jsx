@@ -13,10 +13,13 @@ export const SocketProvider = ({ children }) => {
   const listenersRef = useRef(new Map());
   const socket = getSocket();
 
-  // Add a notification to state
+  // Add a notification to state (max 10, no duplicates)
   const addNotification = useCallback((item) => {
-    setNotifications(prev => [item, ...prev.slice(0, 49)]);
-    setUnreadCount(c => c + 1);
+    setNotifications(prev => {
+      if (prev.some(n => n.id === item.id)) return prev;
+      setUnreadCount(c => c + 1);
+      return [item, ...prev].slice(0, 10);
+    });
   }, []);
 
   // On mount: load missed notifications from DB
@@ -39,7 +42,7 @@ export const SocketProvider = ({ children }) => {
                 timestamp: new Date(n.createdAt),
                 isRead: n.isRead,
               }));
-            return [...newOnes, ...prev].slice(0, 50);
+            return [...newOnes, ...prev].slice(0, 10);
           });
           setUnreadCount(data.filter(n => !n.isRead).length);
         }
@@ -56,6 +59,7 @@ export const SocketProvider = ({ children }) => {
     // ── Online/Offline ────────────────────────────────────────────
     socket.on('user_online',  ({ userId }) => setOnlineUsers(s => new Set([...s, userId])));
     socket.on('user_offline', ({ userId }) => setOnlineUsers(s => { const n = new Set(s); n.delete(userId); return n; }));
+    socket.on('online_users_list', ({ onlineUsers }) => setOnlineUsers(new Set(onlineUsers)));
 
     // ── Missed notifications delivered on reconnect ───────────────
     socket.on('missed_notifications', ({ notifications: missed }) => {
@@ -204,6 +208,7 @@ export const SocketProvider = ({ children }) => {
     return () => {
       socket.off('user_online');
       socket.off('user_offline');
+      socket.off('online_users_list');
       socket.off('missed_notifications');
       socket.off('notification');
       socket.off('task_assigned');
@@ -230,6 +235,21 @@ export const SocketProvider = ({ children }) => {
 
   const emit = (event, data) => socket.emit(event, data);
 
+  const deleteNotification = async (id) => {
+    setNotifications(prev => {
+      const item = prev.find(n => n.id === id);
+      if (item && !item.isRead) {
+        setUnreadCount(c => Math.max(0, c - 1));
+      }
+      return prev.filter(n => n.id !== id);
+    });
+    try {
+      await api.delete(`/notifications/${id}`);
+    } catch (err) {
+      console.error('Failed to delete notification:', err);
+    }
+  };
+
   const clearNotifications = () => { setNotifications([]); setUnreadCount(0); };
 
   const markAllAsRead = async () => {
@@ -247,7 +267,7 @@ export const SocketProvider = ({ children }) => {
   return (
     <SocketContext.Provider value={{
       socket, onlineUsers, notifications, unreadCount,
-      on, off, emit, clearNotifications, markAllAsRead, markOneAsRead, addNotification
+      on, off, emit, clearNotifications, markAllAsRead, markOneAsRead, addNotification, deleteNotification
     }}>
       {children}
     </SocketContext.Provider>

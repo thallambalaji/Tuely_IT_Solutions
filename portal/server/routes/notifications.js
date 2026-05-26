@@ -54,4 +54,15 @@ router.put('/:id/read', authenticate, async (req, res) => {
   }
 });
 
+// DELETE /api/notifications/:id — delete single notification
+router.delete('/:id', authenticate, async (req, res) => {
+  try {
+    const deleted = await Notification.findOneAndDelete({ _id: req.params.id, recipient: req.user._id });
+    if (!deleted) return res.status(404).json({ message: 'Notification not found.' });
+    return res.json({ message: 'Notification deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to delete notification.' });
+  }
+});
+
 module.exports = router;

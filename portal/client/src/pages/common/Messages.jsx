@@ -74,7 +74,19 @@ export default function Messages() {
     try {
       const { data } = await api.get('/messages/conversations');
       // Filter direct types
-      setConversations(data.filter(c => c.type === 'direct'));
+      const filtered = data.filter(c => c.type === 'direct').map(c => {
+        if (activeConv && !activeConv.isGroup && c._id === activeConv._id && c.lastMessage) {
+          return {
+            ...c,
+            lastMessage: {
+              ...c.lastMessage,
+              readBy: c.lastMessage.readBy ? [...new Set([...c.lastMessage.readBy, user._id])] : [user._id]
+            }
+          };
+        }
+        return c;
+      });
+      setConversations(filtered);
     } catch (err) {
       console.error('Error fetching conversations:', err);
     }
@@ -108,6 +120,15 @@ export default function Messages() {
 
   useEffect(() => {
     loadInitialData();
+  }, []);
+
+  // Periodic status and relative times refresh every 1 minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchConversations();
+      fetchUsers();
+    }, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   // Listen to Socket events
@@ -291,6 +312,20 @@ export default function Messages() {
         res = await api.get(`/messages/${conv._id}?page=1&limit=30`);
         emit('join_room', { conversationId: conv._id });
         emit('mark_read', { conversationId: conv._id });
+
+        // Mark as read locally immediately to prevent race conditions on click-away
+        setConversations(prev => prev.map(c => {
+          if (c._id === conv._id && c.lastMessage) {
+            return {
+              ...c,
+              lastMessage: {
+                ...c.lastMessage,
+                readBy: c.lastMessage.readBy ? [...new Set([...c.lastMessage.readBy, user._id])] : [user._id]
+              }
+            };
+          }
+          return c;
+        }));
       }
 
       setMessages(res.data);
@@ -868,7 +903,8 @@ export default function Messages() {
                     // Unread indicators
                     const isLastMessageUnread = conv.lastMessage && 
                       conv.lastMessage.sender !== user._id &&
-                      (!conv.lastMessage.readBy || !conv.lastMessage.readBy.includes(user._id));
+                      (!conv.lastMessage.readBy || !conv.lastMessage.readBy.includes(user._id)) &&
+                      !isSelected;
 
                     return (
                       <button

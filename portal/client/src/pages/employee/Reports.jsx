@@ -20,8 +20,10 @@ export default function EmployeeReports() {
   const fetchReports = async () => {
     setLoading(true);
     try {
-      const start = new Date(selectedYear, selectedMonth - 1, 1).toISOString().split('T')[0];
-      const end = new Date(selectedYear, selectedMonth, 0).toISOString().split('T')[0];
+      const pad = (num) => String(num).padStart(2, '0');
+      const start = `${selectedYear}-${pad(selectedMonth)}-01`;
+      const lastDay = new Date(Date.UTC(selectedYear, selectedMonth, 0)).getUTCDate();
+      const end = `${selectedYear}-${pad(selectedMonth)}-${pad(lastDay)}`;
 
       // Fetch logs
       const [attRes, logsRes] = await Promise.all([
@@ -59,14 +61,19 @@ export default function EmployeeReports() {
   // Helper: Find attendance record for a specific day
   const getDayRecord = (dayNum) => {
     if (!dayNum) return null;
-    const dateStr = new Date(selectedYear, selectedMonth - 1, dayNum).toISOString().split('T')[0];
-    return attendance.find(r => new Date(r.date).toISOString().split('T')[0] === dateStr);
+    const pad = (num) => String(num).padStart(2, '0');
+    const dateStr = `${selectedYear}-${pad(selectedMonth)}-${pad(dayNum)}`;
+    return attendance.find(r => {
+      const d = new Date(r.date);
+      const rDateStr = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+      return rDateStr === dateStr;
+    });
   };
 
   // Stats calculation
   const totalMarkedDays = attendance.length;
   const presentDays = attendance.filter(r => r.status === 'Present').length;
-  const halfDays = attendance.filter(r => r.status === 'Half-day').length;
+  const halfDays = attendance.filter(r => r.status === 'Half Day').length;
   const leaveDays = attendance.filter(r => r.status === 'Leave').length;
   const absentDays = attendance.filter(r => r.status === 'Absent').length;
 
@@ -135,7 +142,7 @@ export default function EmployeeReports() {
                 {/* Legend */}
                 <div className="flex flex-wrap gap-3 text-[10px] font-bold">
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Present</span>
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Half-day</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Half Day</span>
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gold" /> Leave</span>
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Absent</span>
                 </div>
@@ -162,7 +169,7 @@ export default function EmployeeReports() {
                     } else if (record.status === 'Absent') {
                       cellClass = 'bg-red-50 border-2 border-red-500 text-red-800';
                       badge = <span className="absolute bottom-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />;
-                    } else if (record.status === 'Half-day') {
+                    } else if (record.status === 'Half Day') {
                       cellClass = 'bg-orange-50 border-2 border-orange-500 text-orange-800';
                       badge = <span className="absolute bottom-1.5 w-1.5 h-1.5 rounded-full bg-orange-500" />;
                     } else if (record.status === 'Leave') {
@@ -173,6 +180,7 @@ export default function EmployeeReports() {
 
                   const isWeekend = new Date(selectedYear, selectedMonth - 1, day).getDay() === 0 || 
                                     new Date(selectedYear, selectedMonth - 1, day).getDay() === 6;
+                  const isEdited = record && record.createdAt && record.updatedAt && (new Date(record.updatedAt).getTime() - new Date(record.createdAt).getTime() > 1000);
 
                   return (
                     <div
@@ -180,14 +188,19 @@ export default function EmployeeReports() {
                       className={`relative aspect-square rounded-xl flex flex-col items-center justify-center font-heading font-bold text-base transition-all cursor-pointer ${cellClass} ${
                         isWeekend && !record ? 'text-navy text-opacity-35' : ''
                       }`}
-                      title={record?.notes ? `Notes: ${record.notes}` : undefined}
+                      title={record?.notes ? `Notes: ${record.notes}${isEdited ? ' (Edited)' : ''}` : isEdited ? 'Edited by HR' : undefined}
                     >
                       <span>{day}</span>
                       {badge}
 
+                      {/* Edited marker (tiny gold dot on top left) */}
+                      {isEdited && (
+                        <span className="absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-gold" title="Edited by HR" />
+                      )}
+
                       {/* Tooltip Memo if note exists */}
                       {record?.notes && (
-                        <div className="absolute top-1 right-1 group-hover:block">
+                        <div className="absolute top-1.5 right-1.5">
                           <Info size={10} className="text-navy text-opacity-35" />
                         </div>
                       )}
@@ -201,16 +214,21 @@ export default function EmployeeReports() {
                 <div className="mt-8 border-t border-navy border-opacity-5 pt-5 text-left">
                   <h4 className="font-heading text-navy text-sm font-bold mb-3">Audit Notes / Memos</h4>
                   <div className="space-y-2">
-                    {attendance.filter(r => r.notes).map(r => (
-                      <div key={r._id} className="flex gap-2 items-start text-xs bg-cream p-2.5 rounded-xl border border-navy border-opacity-5">
-                        <span className="font-semibold text-gold tracking-widest min-w-[70px] uppercase">
-                          Day {new Date(r.date).getDate()}:
-                        </span>
-                        <p className="text-navy text-opacity-70 leading-normal">
-                          <span className="font-bold">{r.status}</span> · {r.notes}
-                        </p>
-                      </div>
-                    ))}
+                    {attendance.filter(r => r.notes).map(r => {
+                      const isEdited = r.createdAt && r.updatedAt && (new Date(r.updatedAt).getTime() - new Date(r.createdAt).getTime() > 1000);
+                      return (
+                        <div key={r._id} className="flex gap-2 items-start text-xs bg-cream p-2.5 rounded-xl border border-navy border-opacity-5">
+                          <span className="font-semibold text-gold tracking-widest min-w-[70px] uppercase">
+                            Day {new Date(r.date).getUTCDate()}:
+                          </span>
+                          <p className="text-navy text-opacity-70 leading-normal">
+                            <span className="font-bold">{r.status}</span>
+                            {isEdited && <span className="text-[9px] bg-gold bg-opacity-20 text-gold px-1.5 py-0.5 rounded font-semibold ml-1.5">Edited</span>}
+                            {" · "}{r.notes}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -254,7 +272,7 @@ export default function EmployeeReports() {
                 
                 {[
                   { label: 'Present Days', value: presentDays, color: 'text-green-600', icon: CheckCircle2 },
-                  { label: 'Half-days Marked', value: halfDays, color: 'text-orange-500', icon: AlertTriangle },
+                  { label: 'Half Days Marked', value: halfDays, color: 'text-orange-500', icon: AlertTriangle },
                   { label: 'Approved Leaves', value: leaveDays, color: 'text-gold', icon: CalendarIcon },
                   { label: 'Absent Days', value: absentDays, color: 'text-red-500', icon: AlertTriangle },
                 ].map(({ label, value, color, icon: Icon }) => (

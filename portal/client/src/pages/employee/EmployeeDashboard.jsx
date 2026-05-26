@@ -22,7 +22,11 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = (() => {
+          const d = new Date();
+          const pad = (num) => String(num).padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        })();
         const [tasksRes, logsRes, annRes] = await Promise.all([
           api.get('/tasks'),
           api.get(`/work-logs?date=${today}`),

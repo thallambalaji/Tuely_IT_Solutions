@@ -9,8 +9,31 @@ const CATEGORIES = ['Development', 'Design', 'Testing', 'Documentation', 'Meetin
 
 const emptyTask = () => ({ taskName: '', description: '', timeSpent: '', status: 'In Progress', category: 'Development', isOther: false });
 
+const formatHoursToHHMM = (hours) => {
+  if (hours === undefined || hours === null || isNaN(hours)) return '';
+  const hrs = Math.floor(hours);
+  const mins = Math.round((hours - hrs) * 60);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(hrs)}:${pad(mins)}`;
+};
+
+const parseHHMMToHours = (val) => {
+  if (!val) return 0;
+  const parts = val.split(/[:.]/);
+  const hrs = parseInt(parts[0], 10) || 0;
+  let mins = 0;
+  if (parts[1]) {
+    mins = parseInt(parts[1], 10) || 0;
+  }
+  return hrs + (mins / 60);
+};
+
 export default function WorkLog() {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const getLocalDateString = (d = new Date()) => {
+    const pad = (num) => String(num).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString());
   const [submitted, setSubmitted] = useState(false);
   const [existingLog, setExistingLog] = useState(null);
   const [tasks, setTasks] = useState([emptyTask()]);
@@ -48,12 +71,16 @@ export default function WorkLog() {
       if (data?.[0]) {
         setExistingLog(data[0]);
         setSubmitted(true);
-        setTasks(data[0].tasks);
+        const formattedTasks = data[0].tasks.map(t => ({
+          ...t,
+          timeSpent: formatHoursToHHMM(t.timeSpent)
+        }));
+        setTasks(formattedTasks);
         setNotes(data[0].notes || '');
       } else {
         setExistingLog(null);
         setSubmitted(false);
-        if (dateStr === new Date().toISOString().split('T')[0]) {
+        if (dateStr === getLocalDateString()) {
           setTasks([emptyTask()]);
           setNotes('');
         } else {
@@ -73,7 +100,7 @@ export default function WorkLog() {
     fetchLogForDate(selectedDate);
   }, [selectedDate]);
 
-  const totalHours = tasks.reduce((s, t) => s + (parseFloat(t.timeSpent) || 0), 0);
+  const totalHoursDecimal = tasks.reduce((s, t) => s + (parseHHMMToHours(t.timeSpent) || 0), 0);
 
   const addTask = () => {
     if (tasks.length >= 10) return;
@@ -86,6 +113,21 @@ export default function WorkLog() {
     setTasks(t => t.map((task, idx) => idx === i ? { ...task, [field]: value } : task));
   };
 
+  const handleTimeSpentChange = (i, value) => {
+    updateTask(i, 'timeSpent', value);
+    const parts = value.split(/[:.]/);
+    if (parts.length === 2) {
+      const minsStr = parts[1];
+      if (minsStr.length >= 2) {
+        const mins = parseInt(minsStr, 10);
+        if (!isNaN(mins) && mins >= 60) {
+          alert('check the MM. Minutes cannot be 60 or more.');
+          updateTask(i, 'timeSpent', `${parts[0]}:59`);
+        }
+      }
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -93,11 +135,34 @@ export default function WorkLog() {
     const validTasks = tasks.filter(t => t.taskName.trim());
     if (validTasks.length === 0) return setError('Please add at least one task.');
 
+    // Validate all tasks' timeSpent formats
+    for (let i = 0; i < validTasks.length; i++) {
+      const t = validTasks[i];
+      const val = String(t.timeSpent).trim();
+      const regex = /^(\d+)[:.](\d{1,2})$/;
+      const match = val.match(regex);
+      if (!match) {
+        setError(`Task ${i + 1} time spent must be in HH:MM format (e.g. 1:30).`);
+        return;
+      }
+      const mins = parseInt(match[2], 10);
+      if (mins >= 60) {
+        alert(`Task ${i + 1}: check the MM. Minutes cannot be 60 or more.`);
+        setError(`Task ${i + 1}: check the MM.`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
-      const { data } = await api.post('/work-logs', { tasks: validTasks, notes, date: selectedDate });
+      const tasksToPost = validTasks.map(t => ({
+        ...t,
+        timeSpent: parseHHMMToHours(t.timeSpent)
+      }));
+      const { data } = await api.post('/work-logs', { tasks: tasksToPost, notes, date: selectedDate });
       setExistingLog(data.log);
       setSubmitted(true);
+      setTasks(data.log.tasks.map(t => ({ ...t, timeSpent: formatHoursToHHMM(t.timeSpent) })));
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit. Please try again.');
     } finally {
@@ -134,7 +199,7 @@ export default function WorkLog() {
               type="date"
               value={selectedDate}
               onChange={e => setSelectedDate(e.target.value)}
-              max={new Date().toISOString().split('T')[0]}
+              max={getLocalDateString()}
               className="input py-1.5 px-3 text-xs w-40 shadow-sm"
             />
           </div>
@@ -150,7 +215,7 @@ export default function WorkLog() {
               <div className="flex-1">
                 <h2 className="font-heading text-navy text-2xl font-bold">Log Submitted ✓</h2>
                 <p className="text-navy text-opacity-50 text-sm mt-1">
-                  Submitted at {new Date(existingLog.submittedAt).toLocaleTimeString()} · {existingLog.totalHours}h total
+                  Submitted at {new Date(existingLog.submittedAt).toLocaleTimeString()} · {formatHoursToHHMM(existingLog.totalHours)} total
                 </p>
                 {existingLog.isEditedByHR && (
                   <div className="flex items-center gap-2 mt-2 bg-gold-soft border border-gold border-opacity-30 px-3 py-2 rounded-xl inline-flex">
@@ -180,7 +245,7 @@ export default function WorkLog() {
                           {task.status}
                         </span>
                         <span className="flex items-center gap-1 text-navy text-opacity-50 text-xs font-medium">
-                          <Clock size={12} /> {task.timeSpent}h
+                          <Clock size={12} /> {formatHoursToHHMM(task.timeSpent)}
                         </span>
                       </div>
                     </div>
@@ -200,7 +265,7 @@ export default function WorkLog() {
         )}
 
         {/* Form — Not Yet Submitted */}
-        {!submitted && selectedDate === new Date().toISOString().split('T')[0] && (
+        {!submitted && selectedDate === getLocalDateString() && (
           <motion.form
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -213,7 +278,7 @@ export default function WorkLog() {
                 <Clock size={20} className="text-gold" />
                 <span className="font-heading text-navy font-semibold text-lg">Total Hours Today</span>
               </div>
-              <span className="font-heading text-4xl font-bold text-gold">{totalHours.toFixed(1)}h</span>
+              <span className="font-heading text-4xl font-bold text-gold">{formatHoursToHHMM(totalHoursDecimal)}</span>
             </div>
 
             {/* Task Entries */}
@@ -285,16 +350,13 @@ export default function WorkLog() {
                       />
                     </div>
                     <div>
-                      <label className="label">Time Spent (hours) *</label>
+                      <label className="label">Time Spent (HH:MM) *</label>
                       <input
                         className="input"
-                        type="number"
-                        min="0.25"
-                        max="24"
-                        step="0.25"
+                        type="text"
                         value={task.timeSpent}
-                        onChange={e => updateTask(i, 'timeSpent', e.target.value)}
-                        placeholder="e.g. 2.5"
+                        onChange={e => handleTimeSpentChange(i, e.target.value)}
+                        placeholder="e.g. 01:30"
                         required
                       />
                     </div>
@@ -382,7 +444,7 @@ export default function WorkLog() {
         )}
 
         {/* Not Submitted for Past Date */}
-        {!submitted && selectedDate !== new Date().toISOString().split('T')[0] && (
+        {!submitted && selectedDate !== getLocalDateString() && (
           <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="card text-center py-16 text-navy text-opacity-40">
             <Lock size={48} className="mx-auto mb-4 opacity-30 text-navy" />
             <p className="text-lg font-heading font-bold text-navy">No Log Submitted</p>

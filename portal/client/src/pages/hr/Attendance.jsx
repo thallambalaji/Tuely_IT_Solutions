@@ -15,6 +15,7 @@ export default function HRAttendance() {
   const [employees, setEmployees] = useState([]);
   const [attendance, setAttendance] = useState({}); // keyed by employeeId
   const [notes, setNotes] = useState({}); // keyed by employeeId
+  const [editedRecords, setEditedRecords] = useState({}); // keyed by employeeId
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
@@ -23,7 +24,11 @@ export default function HRAttendance() {
   const [savingAll, setSavingAll] = useState(false);
   
   // Date and View Configuration
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const getLocalDateString = (d = new Date()) => {
+    const pad = (num) => String(num).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString());
   const [viewMode, setViewMode] = useState('daily'); // 'daily' | 'monthly'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
@@ -48,13 +53,16 @@ export default function HRAttendance() {
         setEmployees(activeEmployees);
         const attMap = {};
         const notesMap = {};
+        const editedMap = {};
         activeEmployees.forEach(emp => {
           const record = attendanceRes.data.find(r => (r.employee?._id || r.employee) === emp._id);
           attMap[emp._id] = record ? record.status : '';
           notesMap[emp._id] = record ? record.notes || '' : '';
+          editedMap[emp._id] = record && record.createdAt && record.updatedAt && (new Date(record.updatedAt).getTime() - new Date(record.createdAt).getTime() > 1000) ? true : false;
         });
         setAttendance(attMap);
         setNotes(notesMap);
+        setEditedRecords(editedMap);
         setOriginalAttendance(attMap);
         setOriginalNotes(notesMap);
         setUnsavedChanges(false);
@@ -153,15 +161,17 @@ export default function HRAttendance() {
   const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
   const monthDaysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  // Helper to find status of a specific day in monthly log
-  const getDayStatus = (employeeId, dayNum) => {
-    const dateStr = new Date(selectedYear, selectedMonth - 1, dayNum).toISOString().split('T')[0];
-    const log = monthlyLogs.find(r => {
+  // Helper to find attendance record of a specific day in monthly log
+  const getDayRecord = (employeeId, dayNum) => {
+    const pad = (num) => String(num).padStart(2, '0');
+    const dateStr = `${selectedYear}-${pad(selectedMonth)}-${pad(dayNum)}`;
+    return monthlyLogs.find(r => {
       const empId = r.employee?._id || r.employee;
-      const logDate = new Date(r.date).toISOString().split('T')[0];
-      return empId === employeeId && logDate === dateStr;
+      if (empId !== employeeId) return false;
+      const d = new Date(r.date);
+      const logDate = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+      return logDate === dateStr;
     });
-    return log ? log.status : null;
   };
 
   // Export Daily/Monthly Attendance as CSV
@@ -182,7 +192,10 @@ export default function HRAttendance() {
       
       filteredEmployees.forEach(emp => {
         csvContent += `"${emp.fullName}","${emp.department}",`;
-        const statuses = monthDaysArray.map(d => getDayStatus(emp._id, d) || "—");
+        const statuses = monthDaysArray.map(d => {
+          const r = getDayRecord(emp._id, d);
+          return r ? r.status : "—";
+        });
         csvContent += statuses.join(",") + "\n";
       });
     }
@@ -382,7 +395,14 @@ export default function HRAttendance() {
                             </div>
                           )}
                           <div>
-                            <p className="font-heading font-bold text-navy leading-tight">{emp.fullName}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-heading font-bold text-navy leading-tight">{emp.fullName}</p>
+                              {editedRecords[emp._id] && (
+                                <span className="text-[9px] bg-gold bg-opacity-20 text-gold px-1.5 py-0.5 rounded font-semibold flex-shrink-0">
+                                  Edited
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[10px] text-navy text-opacity-45 mt-0.5">{emp.designation}</p>
                           </div>
                         </td>
@@ -497,7 +517,10 @@ export default function HRAttendance() {
 
                       {/* Days row */}
                       {monthDaysArray.map(d => {
-                        const status = getDayStatus(emp._id, d);
+                        const record = getDayRecord(emp._id, d);
+                        const status = record ? record.status : null;
+                        const isEdited = record && record.createdAt && record.updatedAt && (new Date(record.updatedAt).getTime() - new Date(record.createdAt).getTime() > 1000);
+                        
                         let indicatorClass = 'bg-gray-200 text-gray-400';
                         let symbol = '—';
                         if (status === 'Present') { indicatorClass = 'bg-green-100 text-success'; symbol = 'P'; }
@@ -507,12 +530,17 @@ export default function HRAttendance() {
                         
                         return (
                           <td key={d} className="p-1 text-center w-8">
-                            <span
-                              className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold mx-auto transition-transform hover:scale-110 ${indicatorClass}`}
-                              title={status ? `${status} on Day ${d}` : `No record`}
-                            >
-                              {symbol}
-                            </span>
+                            <div className="relative">
+                              <span
+                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold mx-auto transition-transform hover:scale-110 ${indicatorClass}`}
+                                title={status ? `${status} on Day ${d}${isEdited ? ' (Edited)' : ''}${record.notes ? ` - ${record.notes}` : ''}` : `No record`}
+                              >
+                                {symbol}
+                              </span>
+                              {isEdited && (
+                                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-gold border border-white" title="Edited" />
+                              )}
+                            </div>
                           </td>
                         );
                       })}

@@ -10,7 +10,7 @@ import { getFullUrl } from '../../utils/api';
 export const Header = ({ title }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { notifications, unreadCount, markAllAsRead, markOneAsRead, clearNotifications } = useSocket();
+  const { notifications, unreadCount, markAllAsRead, markOneAsRead, clearNotifications, deleteNotification } = useSocket();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -95,32 +95,46 @@ export const Header = ({ title }) => {
                   </div>
                 ) : (
                   notifications.map((notif) => (
-                    <button
+                    <div
                       key={notif.id}
-                      onClick={() => {
-                        markOneAsRead && markOneAsRead(notif.id);
-                        if (notif.link) navigate(notif.link);
-                        setShowDropdown(false);
-                      }}
-                      className={`w-full flex gap-3 px-4 py-3 border-b border-navy border-opacity-5 hover:bg-cream transition-colors text-left relative ${
+                      className={`w-full flex items-center justify-between border-b border-navy border-opacity-5 hover:bg-cream transition-colors relative ${
                         !notif.isRead ? 'bg-gold bg-opacity-[0.03]' : ''
                       }`}
                     >
-                      <div className="w-8 h-8 rounded-full bg-cream flex items-center justify-center flex-shrink-0 mt-0.5">
-                        {getNotificationIcon(notif)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-xs text-navy leading-normal ${!notif.isRead ? 'font-bold' : ''}`}>
-                          {notif.message}
-                        </p>
-                        <p className="text-[10px] text-navy text-opacity-45 mt-1">
-                          {notif.timestamp ? new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                        </p>
-                      </div>
-                      {!notif.isRead && (
-                        <span className="absolute top-4 right-4 w-2 h-2 bg-gold rounded-full" />
-                      )}
-                    </button>
+                      <button
+                        onClick={() => {
+                          markOneAsRead && markOneAsRead(notif.id);
+                          if (notif.link) navigate(notif.link);
+                          setShowDropdown(false);
+                        }}
+                        className="flex-1 flex gap-3 px-4 py-3 text-left min-w-0"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-cream flex items-center justify-center flex-shrink-0 mt-0.5">
+                          {getNotificationIcon(notif)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs text-navy leading-normal ${!notif.isRead ? 'font-bold' : ''}`}>
+                            {notif.message}
+                          </p>
+                          <p className="text-[10px] text-navy text-opacity-45 mt-1">
+                            {notif.timestamp ? new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </p>
+                        </div>
+                        {!notif.isRead && (
+                          <span className="w-2 h-2 bg-gold rounded-full self-center flex-shrink-0 mr-1" />
+                        )}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteNotification && deleteNotification(notif.id);
+                        }}
+                        className="p-2 mr-3 text-navy text-opacity-35 hover:text-error rounded-lg hover:bg-navy hover:bg-opacity-5 transition-all duration-200 flex-shrink-0"
+                        title="Delete notification"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   ))
                 )}
               </div>

@@ -56,6 +56,10 @@ const socketHandler = (io) => {
     await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
     socket.broadcast.emit('user_online', { userId });
 
+    // Send current list of online users to the connecting socket
+    const activeUserIds = Array.from(connectedUsers.keys());
+    socket.emit('online_users_list', { onlineUsers: activeUserIds });
+
     // ── Deliver missed notifications on connect ───────────────────
     try {
       const missed = await Notification.find({ recipient: userId, isDelivered: false })

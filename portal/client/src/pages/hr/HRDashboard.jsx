@@ -56,7 +56,11 @@ export default function HRDashboard() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = (() => {
+          const d = new Date();
+          const pad = (num) => String(num).padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        })();
         const [usersRes, workLogsRes, leavesRes, tasksRes, attendanceRes] = await Promise.all([
           api.get('/users'),
           api.get(`/work-logs?date=${today}`),

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Megaphone, Plus, Pin, Trash2, Calendar, Send,
-  Globe, Laptop, ShieldAlert, Loader2, X
+  Globe, Laptop, ShieldAlert, Loader2, X, Edit2, Save
 } from 'lucide-react';
 import { Sidebar } from '../../components/common/Sidebar';
 import { Header } from '../../components/common/Header';
@@ -20,6 +20,15 @@ export default function HRAnnouncements() {
   const [audience, setAudience] = useState('All');
   const [isPinned, setIsPinned] = useState(false);
   const [formError, setFormError] = useState('');
+
+  // Edit Form State
+  const [editAnn, setEditAnn] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editAudience, setEditAudience] = useState('All');
+  const [editIsPinned, setEditIsPinned] = useState(false);
+  const [editFormError, setEditFormError] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   const fetchAnnouncements = async () => {
     try {
@@ -64,6 +73,41 @@ export default function HRAnnouncements() {
       setFormError(err.response?.data?.message || 'Failed to post announcement.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleStartEdit = (ann) => {
+    setEditAnn(ann);
+    setEditTitle(ann.title);
+    setEditDescription(ann.description);
+    setEditAudience(ann.audience || 'All');
+    setEditIsPinned(ann.isPinned || false);
+    setEditFormError('');
+  };
+
+  const handleEditAnnouncement = async (e) => {
+    e.preventDefault();
+    setEditFormError('');
+
+    if (!editTitle.trim() || !editDescription.trim()) {
+      setEditFormError('Title and Description are required.');
+      return;
+    }
+
+    setEditSubmitting(true);
+    try {
+      await api.put(`/announcements/${editAnn._id}`, {
+        title: editTitle,
+        description: editDescription,
+        audience: editAudience,
+        isPinned: editIsPinned
+      });
+      setEditAnn(null);
+      fetchAnnouncements();
+    } catch (err) {
+      setEditFormError(err.response?.data?.message || 'Failed to edit announcement.');
+    } finally {
+      setEditSubmitting(false);
     }
   };
 
@@ -144,14 +188,23 @@ export default function HRAnnouncements() {
                       </p>
                     </div>
 
-                    {/* Delete action */}
-                    <button
-                      onClick={() => handleDelete(ann._id)}
-                      className="p-2 hover:bg-red-50 text-error rounded-xl transition-colors self-start"
-                      title="Delete announcement"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {/* Action buttons */}
+                    <div className="flex gap-2 self-start">
+                      <button
+                        onClick={() => handleStartEdit(ann)}
+                        className="p-2 hover:bg-cream text-gold rounded-xl transition-colors animate-pulse-slow"
+                        title="Edit announcement"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(ann._id)}
+                        className="p-2 hover:bg-red-50 text-error rounded-xl transition-colors"
+                        title="Delete announcement"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               ))
@@ -250,6 +303,106 @@ export default function HRAnnouncements() {
                       Publish Notice
                     </button>
                     <button type="button" onClick={() => setShowPostModal(false)} className="btn-secondary flex-1 py-2 text-sm">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* ─── Edit Announcement Modal ──────────────────────────── */}
+        <AnimatePresence>
+          {editAnn && (
+            <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.4 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setEditAnn(null)}
+                className="fixed inset-0 bg-navy"
+              />
+              
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="card w-full max-w-md relative z-50"
+              >
+                <div className="flex justify-between items-center mb-6 pb-3 border-b border-navy border-opacity-10">
+                  <h2 className="font-heading text-navy text-xl font-bold flex items-center gap-2">
+                    <Megaphone className="text-gold" size={20} /> Edit Broadcast Notice
+                  </h2>
+                  <button onClick={() => setEditAnn(null)} className="p-2 hover:bg-cream rounded-full"><X size={16} /></button>
+                </div>
+
+                <form onSubmit={handleEditAnnouncement} className="space-y-4 text-left">
+                  {editFormError && (
+                    <div className="bg-red-50 border border-red-200 text-error rounded-xl p-3 text-xs flex items-center gap-2 font-semibold">
+                      <ShieldAlert size={14} /> {editFormError}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="label">Title</label>
+                    <input
+                      type="text"
+                      placeholder="Enter a descriptive alert header..."
+                      value={editTitle}
+                      onChange={e => setEditTitle(e.target.value)}
+                      className="input"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">Content / Body</label>
+                    <textarea
+                      placeholder="Write details of the broadcast alert..."
+                      value={editDescription}
+                      onChange={e => setEditDescription(e.target.value)}
+                      className="input min-h-[100px] py-2.5 text-xs"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">Audience Scope</label>
+                    <select
+                      value={editAudience}
+                      onChange={e => setEditAudience(e.target.value)}
+                      className="input"
+                    >
+                      <option value="All">All Employees</option>
+                      <option value="IT">IT Only</option>
+                      <option value="Non-IT">Non-IT Only</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2 py-2">
+                    <input
+                      type="checkbox"
+                      id="editIsPinned"
+                      checked={editIsPinned}
+                      onChange={e => setEditIsPinned(e.target.checked)}
+                      className="w-4 h-4 rounded text-gold focus:ring-gold border-navy border-opacity-15 cursor-pointer"
+                    />
+                    <label htmlFor="editIsPinned" className="text-xs font-semibold text-navy cursor-pointer flex items-center gap-1">
+                      <Pin size={12} className="text-gold fill-current" /> Pin to Dashboard Banner
+                    </label>
+                  </div>
+
+                  <div className="flex gap-3 pt-4 border-t border-navy border-opacity-10">
+                    <button
+                      type="submit"
+                      disabled={editSubmitting}
+                      className="btn-gold flex-1 py-2 text-sm flex items-center justify-center gap-2"
+                    >
+                      {editSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                      Save Changes
+                    </button>
+                    <button type="button" onClick={() => setEditAnn(null)} className="btn-secondary flex-1 py-2 text-sm">
                       Cancel
                     </button>
                   </div>

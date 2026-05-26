@@ -36,11 +36,16 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      const user = await login(form.companyEmail, form.password);
+      const user = await login(form.companyEmail, form.password, role);
       const dest = from || (user.role === 'hr' ? '/hr/dashboard' : '/employee/dashboard');
       navigate(dest, { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid credentials.');
+      const errMsg = err.response?.data?.message || 'Invalid credentials.';
+      if (errMsg.includes('Access Denied')) {
+        alert(errMsg);
+      } else {
+        setError(errMsg);
+      }
       setShake(true);
       setTimeout(() => setShake(false), 600);
     } finally {

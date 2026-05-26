@@ -22,6 +22,25 @@ const CATEGORY_COLORS = {
 
 const CATEGORIES = ['Development', 'Meeting', 'Review', 'Research', 'Support', 'Design', 'Testing', 'Other'];
 
+const formatHoursToHHMM = (hours) => {
+  if (hours === undefined || hours === null || isNaN(hours)) return '00:00';
+  const hrs = Math.floor(hours);
+  const mins = Math.round((hours - hrs) * 60);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(hrs)}:${pad(mins)}`;
+};
+
+const parseHHMMToHours = (val) => {
+  if (!val) return 0;
+  const parts = val.split(/[:.]/);
+  const hrs = parseInt(parts[0], 10) || 0;
+  let mins = 0;
+  if (parts[1]) {
+    mins = parseInt(parts[1], 10) || 0;
+  }
+  return hrs + (mins / 60);
+};
+
 function InitialsAvatar({ name, size = 36 }) {
   const initials = name ? name.split(' ').filter(Boolean).slice(0, 2).map(n => n[0].toUpperCase()).join('') : '?';
   return (
@@ -92,16 +111,39 @@ export default function HRWorkLogs() {
   const openLog = (log) => {
     setActiveLog(log);
     setIsEditing(false);
-    setEditTasks(log.tasks.map(t => ({ ...t })));
+    setEditTasks(log.tasks.map(t => ({ ...t, timeSpent: formatHoursToHHMM(t.timeSpent) })));
     setEditNotes(log.notes || '');
   };
 
   const handleSaveEdit = async () => {
     if (!activeLog) return;
+
+    // Validate HH:MM format and minutes MM < 60
+    for (let idx = 0; idx < editTasks.length; idx++) {
+      const t = editTasks[idx];
+      const val = String(t.timeSpent).trim();
+      const regex = /^(\d+)[:.](\d{1,2})$/;
+      const match = val.match(regex);
+      if (!match) {
+        alert(`Task ${idx + 1} time spent must be in HH:MM format (e.g. 1:30).`);
+        return;
+      }
+      const mins = parseInt(match[2], 10);
+      if (mins >= 60) {
+        alert(`Task ${idx + 1}: check the MM. Minutes cannot be 60 or more.`);
+        return;
+      }
+    }
+
     setActionLoading(true);
     try {
+      const tasksToSave = editTasks.map(t => ({
+        ...t,
+        timeSpent: parseHHMMToHours(t.timeSpent)
+      }));
+
       const { data } = await api.put(`/work-logs/${activeLog._id}`, {
-        tasks: editTasks,
+        tasks: tasksToSave,
         notes: editNotes,
       });
       setActiveLog(data.workLog);
@@ -117,6 +159,21 @@ export default function HRWorkLogs() {
 
   const updateEditTask = (idx, field, value) => {
     setEditTasks(tasks => tasks.map((t, i) => i === idx ? { ...t, [field]: value } : t));
+  };
+
+  const handleEditTimeSpentChange = (idx, value) => {
+    updateEditTask(idx, 'timeSpent', value);
+    const parts = value.split(/[:.]/);
+    if (parts.length === 2) {
+      const minsStr = parts[1];
+      if (minsStr.length >= 2) {
+        const mins = parseInt(minsStr, 10);
+        if (!isNaN(mins) && mins >= 60) {
+          alert('check the MM. Minutes cannot be 60 or more.');
+          updateEditTask(idx, 'timeSpent', `${parts[0]}:59`);
+        }
+      }
+    }
   };
 
   // Group logs by employee
@@ -302,9 +359,10 @@ export default function HRWorkLogs() {
                                 onChange={e => updateEditTask(idx, 'description', e.target.value)} />
                             </div>
                             <div>
-                              <label className="label">Time Spent (hrs)</label>
-                              <input type="number" min={0} step={0.5} className="input text-sm" value={task.timeSpent}
-                                onChange={e => updateEditTask(idx, 'timeSpent', parseFloat(e.target.value))} />
+                              <label className="label">Time Spent (HH:MM)</label>
+                              <input type="text" className="input text-sm" value={task.timeSpent}
+                                onChange={e => handleEditTimeSpentChange(idx, e.target.value)}
+                                placeholder="e.g. 01:30" />
                             </div>
                             <div>
                               <label className="label">Status</label>
@@ -350,7 +408,7 @@ export default function HRWorkLogs() {
                             <p className="text-sm text-navy/60 mt-0.5 line-clamp-2">{task.description}</p>
                           </div>
                           <div className="flex-shrink-0 text-right">
-                            <p className="font-bold text-navy text-sm">{task.timeSpent}h</p>
+                            <p className="font-bold text-navy text-sm">{formatHoursToHHMM(task.timeSpent)}</p>
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 inline-block ${task.status === 'Completed' ? 'bg-green-100 text-success' : task.status === 'Blocked' ? 'bg-red-100 text-error' : 'bg-yellow-100 text-yellow-700'}`}>
                               {task.status}
                             </span>
