@@ -45,18 +45,6 @@ export const AuthProvider = ({ children }) => {
     checkSession();
   }, []);
 
-  // Auto-logout check interval (absolute 1-hour session timeout)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const expiresAt = sessionStorage.getItem('tc_token_expires_at');
-      if (expiresAt && Date.now() > Number(expiresAt) && user) {
-        console.log('Session expired. Logging out.');
-        logout();
-      }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [user, logout]);
-
   const login = useCallback(async (companyEmail, password) => {
     const { data } = await api.post('/auth/login', { companyEmail, password });
     setUser(data.user);
@@ -78,6 +66,18 @@ export const AuthProvider = ({ children }) => {
     disconnectSocket();
     window.location.href = '/portal/login';
   }, []);
+
+  // Auto-logout check interval (absolute 1-hour session timeout)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const expiresAt = sessionStorage.getItem('tc_token_expires_at');
+      if (expiresAt && Date.now() > Number(expiresAt) && user) {
+        console.log('Session expired. Logging out.');
+        logout();
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [user, logout]);
 
   const toggleDark = useCallback(() => setDarkMode(d => !d), []);
 
