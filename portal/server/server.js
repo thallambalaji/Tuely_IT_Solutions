@@ -52,7 +52,8 @@ const allowedOrigins = [
   'https://tuely.netlify.app'
 ];
 if (process.env.CLIENT_URL) {
-  allowedOrigins.push(process.env.CLIENT_URL);
+  const sanitizedClientUrl = process.env.CLIENT_URL.replace(/\/$/, '');
+  allowedOrigins.push(sanitizedClientUrl);
 }
 
 // ── Socket.IO ───────────────────────────────────────────────────
