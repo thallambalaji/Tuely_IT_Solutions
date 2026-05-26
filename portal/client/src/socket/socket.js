@@ -8,7 +8,7 @@ import { API_BASE_URL } from '../utils/api';
 let socket = null;
 
 export const getSocket = (token) => {
-  const activeToken = token || localStorage.getItem('tc_token');
+  const activeToken = token || sessionStorage.getItem('tc_token');
 
   if (!socket) {
     const socketUrl = API_BASE_URL || 'https://tuely-it-solutions.onrender.com';
@@ -33,7 +33,7 @@ export const getSocket = (token) => {
 
 export const connectSocket = (token) => {
   const s = getSocket(token);
-  const activeToken = token || localStorage.getItem('tc_token');
+  const activeToken = token || sessionStorage.getItem('tc_token');
   s.auth = { token: activeToken };
   if (!s.connected) s.connect();
   return s;

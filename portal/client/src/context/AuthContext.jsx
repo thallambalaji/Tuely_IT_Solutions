@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }) => {
   // Check existing session on mount
   useEffect(() => {
     const checkSession = async () => {
-      const storedToken = localStorage.getItem('tc_token');
+      const storedToken = sessionStorage.getItem('tc_token');
       if (!storedToken) {
         setUser(null);
         setLoading(false);
@@ -28,12 +28,16 @@ export const AuthProvider = ({ children }) => {
         const { data } = await api.get('/auth/me');
         setUser(data.user);
         if (data.token) {
-          localStorage.setItem('tc_token', data.token);
+          sessionStorage.setItem('tc_token', data.token);
+          if (!sessionStorage.getItem('tc_token_expires_at')) {
+            sessionStorage.setItem('tc_token_expires_at', String(Date.now() + 60 * 60 * 1000));
+          }
         }
         connectSocket(data.token || storedToken);
       } catch {
         setUser(null);
-        localStorage.removeItem('tc_token');
+        sessionStorage.removeItem('tc_token');
+        sessionStorage.removeItem('tc_token_expires_at');
       } finally {
         setLoading(false);
       }
@@ -41,11 +45,24 @@ export const AuthProvider = ({ children }) => {
     checkSession();
   }, []);
 
+  // Auto-logout check interval (absolute 1-hour session timeout)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const expiresAt = sessionStorage.getItem('tc_token_expires_at');
+      if (expiresAt && Date.now() > Number(expiresAt) && user) {
+        console.log('Session expired. Logging out.');
+        logout();
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [user, logout]);
+
   const login = useCallback(async (companyEmail, password) => {
     const { data } = await api.post('/auth/login', { companyEmail, password });
     setUser(data.user);
     if (data.token) {
-      localStorage.setItem('tc_token', data.token);
+      sessionStorage.setItem('tc_token', data.token);
+      sessionStorage.setItem('tc_token_expires_at', String(Date.now() + 60 * 60 * 1000));
     }
     connectSocket(data.token);
     return data.user;
@@ -55,7 +72,8 @@ export const AuthProvider = ({ children }) => {
     try {
       await api.post('/auth/logout');
     } catch (_) {}
-    localStorage.removeItem('tc_token');
+    sessionStorage.removeItem('tc_token');
+    sessionStorage.removeItem('tc_token_expires_at');
     setUser(null);
     disconnectSocket();
     window.location.href = '/portal/login';
