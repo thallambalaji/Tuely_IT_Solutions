@@ -49,6 +49,7 @@ const uploadsBase = path.join(__dirname, 'uploads');
 
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://localhost:5174',
   'https://tuely.netlify.app'
 ];
 if (process.env.CLIENT_URL) {
